@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sorting Algorithm Visualizer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <h1>Sorting Visualizer</h1>
+    <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">🌙</button>
+  </header>
+
+  <main class="container">
+    <!-- Controls panel -->
+    <section class="controls">
+      <div class="control-group">
+        <label for="algorithm">Algorithm</label>
+        <select id="algorithm">
+          <option value="bubble">Bubble Sort</option>
+          <option value="selection">Selection Sort</option>
+          <option value="quick">Quick Sort</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label for="size">Array Size: <span id="sizeValue">50</span></label>
+        <input type="range" id="size" min="10" max="120" value="50" />
+      </div>
+
+      <div class="control-group">
+        <label for="speed">Speed: <span id="speedValue">50</span></label>
+        <input type="range" id="speed" min="1" max="100" value="50" />
+      </div>
+
+      <div class="control-group buttons">
+        <button id="generateBtn" class="btn btn-secondary">Generate</button>
+        <button id="startBtn" class="btn btn-primary">Start</button>
+        <button id="resetBtn" class="btn btn-secondary">Reset</button>
+      </div>
+    </section>
+
+    <!-- Visualization area -->
+    <section class="visualizer" id="visualizer"></section>
+
+    <!-- Legend -->
+    <section class="legend">
+      <div class="legend-item"><span class="swatch default"></span> Unsorted</div>
+      <div class="legend-item"><span class="swatch compare"></span> Comparing</div>
+      <div class="legend-item"><span class="swatch swap"></span> Swapping</div>
+      <div class="legend-item"><span class="swatch sorted"></span> Sorted</div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
