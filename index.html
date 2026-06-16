@@ -7,49 +7,159 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="header">
-    <h1>Sorting Visualizer</h1>
-    <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">🌙</button>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Algorithm lab</p>
+      <h1>Sorting Algorithm Visualizer</h1>
+    </div>
+    <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle theme" title="Toggle theme">Dark</button>
   </header>
 
-  <main class="container">
-    <!-- Controls panel -->
-    <section class="controls">
+  <main class="workspace">
+    <section class="control-panel" aria-label="Visualizer controls">
       <div class="control-group">
         <label for="algorithm">Algorithm</label>
         <select id="algorithm">
           <option value="bubble">Bubble Sort</option>
           <option value="selection">Selection Sort</option>
+          <option value="insertion">Insertion Sort</option>
           <option value="quick">Quick Sort</option>
+          <option value="merge">Merge Sort</option>
+          <option value="heap">Heap Sort</option>
         </select>
       </div>
 
       <div class="control-group">
-        <label for="size">Array Size: <span id="sizeValue">50</span></label>
-        <input type="range" id="size" min="10" max="120" value="50" />
+        <label for="pattern">Dataset</label>
+        <select id="pattern">
+          <option value="random">Random</option>
+          <option value="sorted">Sorted</option>
+          <option value="nearly">Nearly Sorted</option>
+          <option value="reversed">Reversed</option>
+          <option value="duplicates">Few Unique</option>
+          <option value="sawtooth">Sawtooth</option>
+        </select>
       </div>
 
       <div class="control-group">
-        <label for="speed">Speed: <span id="speedValue">50</span></label>
+        <label for="size">Array Size <span id="sizeValue">50</span></label>
+        <input type="range" id="size" min="10" max="140" value="50" />
+      </div>
+
+      <div class="control-group">
+        <label for="speed">Speed <span id="speedValue">50</span></label>
         <input type="range" id="speed" min="1" max="100" value="50" />
       </div>
 
-      <div class="control-group buttons">
-        <button id="generateBtn" class="btn btn-secondary">Generate</button>
-        <button id="startBtn" class="btn btn-primary">Start</button>
-        <button id="resetBtn" class="btn btn-secondary">Reset</button>
+      <div class="control-group button-grid">
+        <button id="generateBtn" class="btn btn-secondary" type="button">Generate</button>
+        <button id="startBtn" class="btn btn-primary" type="button">Start</button>
+        <button id="pauseBtn" class="btn btn-secondary" type="button" disabled>Pause</button>
+        <button id="resetBtn" class="btn btn-secondary" type="button">Reset</button>
       </div>
     </section>
 
-    <!-- Visualization area -->
-    <section class="visualizer" id="visualizer"></section>
+    <section class="stage-panel" aria-label="Visualization stage">
+      <div class="stage-header">
+        <div>
+          <p id="algoName" class="eyebrow">Bubble Sort</p>
+          <h2 id="algoTitle">Adjacent swaps with an early win condition</h2>
+          <p id="statusText" class="status-text">Ready for a new run.</p>
+        </div>
+        <div id="complexityBadge" class="complexity-badge">O(n^2)</div>
+      </div>
 
-    <!-- Legend -->
-    <section class="legend">
-      <div class="legend-item"><span class="swatch default"></span> Unsorted</div>
-      <div class="legend-item"><span class="swatch compare"></span> Comparing</div>
-      <div class="legend-item"><span class="swatch swap"></span> Swapping</div>
-      <div class="legend-item"><span class="swatch sorted"></span> Sorted</div>
+      <div class="visualizer-wrap">
+        <section class="visualizer" id="visualizer" aria-label="Array bars"></section>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="Run metrics">
+      <div class="metric">
+        <span>Comparisons</span>
+        <strong id="comparisons">0</strong>
+      </div>
+      <div class="metric">
+        <span>Swaps</span>
+        <strong id="swaps">0</strong>
+      </div>
+      <div class="metric">
+        <span>Writes</span>
+        <strong id="writes">0</strong>
+      </div>
+      <div class="metric">
+        <span>Elapsed</span>
+        <strong id="elapsed">0.0s</strong>
+      </div>
+    </section>
+
+    <section class="lab-panel" aria-label="Algorithm lab details">
+      <article class="profile-panel">
+        <div class="section-heading">
+          <h3>Algorithm Profile</h3>
+          <span id="stabilityBadge">Stable</span>
+        </div>
+        <dl class="trait-grid">
+          <div>
+            <dt>Best</dt>
+            <dd id="bestCase">O(n)</dd>
+          </div>
+          <div>
+            <dt>Average</dt>
+            <dd id="averageCase">O(n^2)</dd>
+          </div>
+          <div>
+            <dt>Worst</dt>
+            <dd id="worstCase">O(n^2)</dd>
+          </div>
+          <div>
+            <dt>Memory</dt>
+            <dd id="memoryUse">O(1)</dd>
+          </div>
+        </dl>
+      </article>
+
+      <article class="history-panel">
+        <div class="section-heading">
+          <h3>Run History</h3>
+          <div class="section-actions">
+            <button id="copySummaryBtn" class="text-button" type="button">Copy Summary</button>
+            <button id="exportHistoryBtn" class="text-button" type="button">Export CSV</button>
+            <button id="clearHistoryBtn" class="text-button" type="button">Clear</button>
+          </div>
+        </div>
+        <div class="history-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Run</th>
+                <th>Dataset</th>
+                <th>Size</th>
+                <th>Comparisons</th>
+                <th>Writes</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+          <p id="emptyHistory" class="empty-state">No completed runs yet.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="details">
+      <div class="legend" aria-label="Bar color legend">
+        <div class="legend-item"><span class="swatch default"></span> Unsorted</div>
+        <div class="legend-item"><span class="swatch compare"></span> Comparing</div>
+        <div class="legend-item"><span class="swatch pivot"></span> Pivot</div>
+        <div class="legend-item"><span class="swatch swap"></span> Moving</div>
+        <div class="legend-item"><span class="swatch sorted"></span> Sorted</div>
+      </div>
+
+      <article class="algorithm-note">
+        <h3 id="noteTitle">How Bubble Sort behaves</h3>
+        <p id="noteBody">It repeatedly compares neighbors and bubbles the largest remaining value to the right side of the array.</p>
+      </article>
     </section>
   </main>
 
