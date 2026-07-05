@@ -2,6 +2,25 @@
 
 All notable changes to Sort Lab (Algorithm Visualizer).
 
+## [2026-07-05] — v3 Massive Improvements
+
+### Added
+- **Shell Sort** and **Radix Sort** — 7th and 8th algorithms with gap-pair and digit-pass visualizations
+- **Teaching Mode** — toggle shows narrated step explanations in a live panel ("Now comparing indices 3 and 7…")
+- **Custom Array Input** — textarea accepts comma-separated values or JSON arrays with validation
+- **Benchmark Tournament** — runs all 8 algorithms sequentially on identical data; ranked leaderboard with times/comparisons
+- **Operations Chart** — canvas sparkline showing cumulative operations over time during a run
+- **Comparison Matrix** — table comparing theoretical Big-O vs actual tournament performance
+- **Service Worker** (`sw.js`) — caches static assets for offline use
+- **Accessibility** — dedicated `aria-live` announcer for teaching narration and run status; teaching panel uses `aria-live="assertive"`
+- New legend swatches: **Digit pass** (Radix) and **Gap pair** (Shell)
+
+### Changed
+- Algorithm count increased from 6 to 8
+- Dataset selector includes **Custom Input** option
+- Run history and CSV export include tournament results
+- PWA now registers service worker on load
+
 ## [2026-07-05] — Major Upgrade
 
 ### Added

@@ -1,7 +1,7 @@
 {
   "name": "Sort Lab — Algorithm Visualizer",
   "short_name": "Sort Lab",
-  "description": "Interactive sorting algorithm visualizer with race mode, step-through, metrics, and lab UI.",
+  "description": "Interactive sorting algorithm visualizer with 8 algorithms, teaching mode, tournament benchmarks, and offline support.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1220",
