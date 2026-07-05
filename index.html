@@ -3,55 +3,152 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sorting Algorithm Visualizer</title>
+  <meta name="description" content="Interactive sorting algorithm visualizer with race mode, step-through, and live metrics." />
+  <meta name="theme-color" content="#0b1220" />
+  <title>Sort Lab — Algorithm Visualizer</title>
+  <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <header class="header">
-    <h1>Sorting Visualizer</h1>
-    <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">🌙</button>
-  </header>
-
-  <main class="container">
-    <!-- Controls panel -->
-    <section class="controls">
-      <div class="control-group">
-        <label for="algorithm">Algorithm</label>
-        <select id="algorithm">
-          <option value="bubble">Bubble Sort</option>
-          <option value="selection">Selection Sort</option>
-          <option value="quick">Quick Sort</option>
-        </select>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">⚗</span>
+        <div>
+          <h1>Sort Lab</h1>
+          <p class="brand-sub">Sorting Algorithm Visualizer</p>
+        </div>
       </div>
-
-      <div class="control-group">
-        <label for="size">Array Size: <span id="sizeValue">50</span></label>
-        <input type="range" id="size" min="10" max="120" value="50" />
+      <div class="topbar-actions">
+        <label class="toggle-pill" title="Sound effects on compare/swap">
+          <input type="checkbox" id="soundToggle" aria-label="Toggle sound" />
+          <span>🔊 Sound</span>
+        </label>
+        <button id="themeToggle" class="icon-btn" aria-label="Toggle dark mode">🌙</button>
       </div>
+    </header>
 
-      <div class="control-group">
-        <label for="speed">Speed: <span id="speedValue">50</span></label>
-        <input type="range" id="speed" min="1" max="100" value="50" />
-      </div>
+    <div class="workspace">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2 class="panel-title">Controls</h2>
 
-      <div class="control-group buttons">
-        <button id="generateBtn" class="btn btn-secondary">Generate</button>
-        <button id="startBtn" class="btn btn-primary">Start</button>
-        <button id="resetBtn" class="btn btn-secondary">Reset</button>
-      </div>
-    </section>
+          <div class="field">
+            <label for="algorithm">Algorithm</label>
+            <select id="algorithm">
+              <option value="bubble">Bubble Sort</option>
+              <option value="selection">Selection Sort</option>
+              <option value="insertion">Insertion Sort</option>
+              <option value="merge">Merge Sort</option>
+              <option value="quick">Quick Sort</option>
+              <option value="heap">Heap Sort</option>
+            </select>
+          </div>
 
-    <!-- Visualization area -->
-    <section class="visualizer" id="visualizer"></section>
+          <div class="field race-field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="raceMode" />
+              <span>Algorithm Race (dual pane)</span>
+            </label>
+            <select id="algorithmRace" disabled>
+              <option value="bubble">Bubble Sort</option>
+              <option value="selection">Selection Sort</option>
+              <option value="insertion">Insertion Sort</option>
+              <option value="merge">Merge Sort</option>
+              <option value="quick" selected>Quick Sort</option>
+              <option value="heap">Heap Sort</option>
+            </select>
+          </div>
 
-    <!-- Legend -->
-    <section class="legend">
-      <div class="legend-item"><span class="swatch default"></span> Unsorted</div>
-      <div class="legend-item"><span class="swatch compare"></span> Comparing</div>
-      <div class="legend-item"><span class="swatch swap"></span> Swapping</div>
-      <div class="legend-item"><span class="swatch sorted"></span> Sorted</div>
-    </section>
-  </main>
+          <div class="field">
+            <label for="dataset">Dataset</label>
+            <select id="dataset">
+              <option value="random">Random</option>
+              <option value="sorted">Sorted</option>
+              <option value="nearly-sorted">Nearly Sorted</option>
+              <option value="reversed">Reversed</option>
+              <option value="few-unique">Few Unique</option>
+              <option value="sawtooth">Sawtooth</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="size">Array Size: <span id="sizeValue">50</span></label>
+            <input type="range" id="size" min="10" max="120" value="50" />
+          </div>
+
+          <div class="field">
+            <label for="speed">Speed: <span id="speedValue">50</span></label>
+            <input type="range" id="speed" min="1" max="100" value="50" />
+          </div>
+
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="stepMode" />
+              <span>Step Mode (manual advance)</span>
+            </label>
+          </div>
+
+          <div class="btn-grid">
+            <button id="generateBtn" class="btn btn-secondary" title="Shortcut: G">Generate</button>
+            <button id="startBtn" class="btn btn-primary" title="Shortcut: S">Start</button>
+            <button id="pauseBtn" class="btn btn-secondary" disabled title="Shortcut: Space">Pause</button>
+            <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
+            <button id="nextStepBtn" class="btn btn-accent" disabled>Next Step</button>
+            <button id="resetBtn" class="btn btn-secondary" title="Shortcut: R">Reset</button>
+          </div>
+
+          <p class="shortcut-hint">Space pause · S start · G generate · R reset</p>
+        </section>
+
+        <section class="panel" id="profilePanel" aria-live="polite"></section>
+
+        <section class="panel">
+          <div class="panel-header-row">
+            <h2 class="panel-title">Run History</h2>
+            <div class="panel-actions">
+              <button id="exportCsvBtn" class="btn btn-ghost btn-sm">Export CSV</button>
+              <button id="copySummaryBtn" class="btn btn-ghost btn-sm">Copy Summary</button>
+            </div>
+          </div>
+          <ul id="historyList" class="history-list"></ul>
+        </section>
+      </aside>
+
+      <main class="main-stage">
+        <p id="statusText" class="status-bar" aria-live="polite">Ready</p>
+
+        <div class="viz-grid" id="vizGrid">
+          <section class="viz-pane" id="panePrimary">
+            <div class="pane-header">
+              <h3>Primary</h3>
+              <div id="metricsPrimary" class="metrics-strip"></div>
+            </div>
+            <div class="visualizer" id="visualizer" role="img" aria-label="Sorting visualization primary pane"></div>
+          </section>
+
+          <section class="viz-pane hidden" id="paneSecondary">
+            <div class="pane-header">
+              <h3>Race</h3>
+              <div id="metricsSecondary" class="metrics-strip"></div>
+            </div>
+            <div class="visualizer" id="visualizerRace" role="img" aria-label="Sorting visualization race pane"></div>
+          </section>
+        </div>
+
+        <section class="legend" id="legend">
+          <div class="legend-item"><span class="swatch default"></span> Unsorted</div>
+          <div class="legend-item"><span class="swatch compare"></span> Comparing</div>
+          <div class="legend-item"><span class="swatch swap"></span> Swapping</div>
+          <div class="legend-item"><span class="swatch write"></span> Writing</div>
+          <div class="legend-item"><span class="swatch pivot"></span> Pivot (Quick Sort)</div>
+          <div class="legend-item"><span class="swatch sorted"></span> Sorted</div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="script.js"></script>
 </body>
