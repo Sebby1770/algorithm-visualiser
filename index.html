@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Interactive sorting algorithm visualizer with race mode, teaching mode, tournament benchmarks, and offline support." />
+  <meta name="description" content="Interactive sorting algorithm visualizer with race mode, quiz mode, teaching mode, tournament benchmarks, and offline support." />
   <meta name="theme-color" content="#0b1220" />
   <title>Sort Lab — Algorithm Visualizer</title>
   <link rel="manifest" href="manifest.json" />
@@ -20,6 +20,8 @@
         </div>
       </div>
       <div class="topbar-actions">
+        <button id="shareUrlBtn" class="btn btn-ghost btn-sm" type="button" title="Copy shareable URL">🔗 Share</button>
+        <button id="presentationBtn" class="btn btn-ghost btn-sm" type="button" title="Presentation mode (Esc to exit)">🖥 Present</button>
         <label class="toggle-pill" title="Sound effects on compare/swap">
           <input type="checkbox" id="soundToggle" aria-label="Toggle sound" />
           <span>🔊 Sound</span>
@@ -44,6 +46,8 @@
               <option value="heap">Heap Sort</option>
               <option value="shell">Shell Sort</option>
               <option value="radix">Radix Sort</option>
+              <option value="counting">Counting Sort</option>
+              <option value="cocktail">Cocktail Shaker Sort</option>
             </select>
           </div>
 
@@ -61,6 +65,8 @@
               <option value="heap">Heap Sort</option>
               <option value="shell">Shell Sort</option>
               <option value="radix">Radix Sort</option>
+              <option value="counting">Counting Sort</option>
+              <option value="cocktail">Cocktail Shaker Sort</option>
             </select>
           </div>
 
@@ -108,6 +114,14 @@
             </label>
           </div>
 
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="quizMode" />
+              <span>Quiz Mode (guess the algorithm)</span>
+            </label>
+            <p id="quizScore" class="quiz-score" aria-live="polite">Score: 0 / 0</p>
+          </div>
+
           <div class="btn-grid">
             <button id="generateBtn" class="btn btn-secondary" title="Shortcut: G">Generate</button>
             <button id="startBtn" class="btn btn-primary" title="Shortcut: S">Start</button>
@@ -117,12 +131,41 @@
             <button id="resetBtn" class="btn btn-secondary" title="Shortcut: R">Reset</button>
           </div>
 
-          <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 8 algorithms on current data">🏆 Benchmark Tournament</button>
+          <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 10 algorithms on current data">🏆 Benchmark Tournament</button>
 
-          <p class="shortcut-hint">Space pause · S start · G generate · R reset</p>
+          <p class="shortcut-hint">Space pause · S start · G generate · R reset · Esc exit present</p>
+        </section>
+
+        <section class="panel" id="recommenderPanel">
+          <h2 class="panel-title">Algorithm Recommender</h2>
+          <p class="panel-sub">Best fit for the current dataset</p>
+          <div id="recommenderContent" class="recommender-content" aria-live="polite"></div>
         </section>
 
         <section class="panel" id="profilePanel" aria-live="polite"></section>
+
+        <section class="panel" id="learningCardsPanel">
+          <h2 class="panel-title">Learning Cards</h2>
+          <p class="panel-sub">Tap to flip — trivia &amp; real-world use cases</p>
+          <div id="learningCard" class="learning-card" tabindex="0" role="button" aria-label="Flip learning card">
+            <div class="learning-card-inner">
+              <div class="learning-card-front">
+                <span class="learning-card-label">Did you know?</span>
+                <p id="learningTrivia" class="learning-card-text"></p>
+              </div>
+              <div class="learning-card-back">
+                <span class="learning-card-label">Use case</span>
+                <p id="learningUseCase" class="learning-card-text"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="quizPanel" hidden>
+          <h2 class="panel-title">Quiz — Which algorithm was that?</h2>
+          <div id="quizGuessGrid" class="quiz-guess-grid"></div>
+          <p id="quizFeedback" class="quiz-feedback" role="status" aria-live="polite"></p>
+        </section>
 
         <section class="panel" id="tournamentPanel" hidden>
           <h2 class="panel-title">Tournament Leaderboard</h2>
@@ -158,10 +201,17 @@
         <div class="viz-grid" id="vizGrid">
           <section class="viz-pane" id="panePrimary">
             <div class="pane-header">
-              <h3>Primary</h3>
+              <h3 id="panePrimaryLabel">Primary</h3>
               <div id="metricsPrimary" class="metrics-strip"></div>
             </div>
-            <div class="visualizer" id="visualizer" role="img" aria-label="Sorting visualization primary pane"></div>
+            <div class="viz-body">
+              <div class="visualizer" id="visualizer" role="img" aria-label="Sorting visualization primary pane"></div>
+              <div id="heatmapPrimary" class="heatmap-strip" aria-label="Per-index access frequency heatmap"></div>
+            </div>
+            <div id="countingArrayPanel" class="counting-panel hidden" aria-label="Counting sort counting array">
+              <span class="counting-panel-label">Counting array</span>
+              <div id="countingArrayDisplay" class="counting-array"></div>
+            </div>
             <div class="ops-chart-wrap">
               <span class="ops-chart-label">Operations over time</span>
               <canvas id="opsChart" class="ops-chart" width="600" height="56" aria-label="Cumulative operations sparkline during current run"></canvas>
@@ -173,7 +223,10 @@
               <h3>Race</h3>
               <div id="metricsSecondary" class="metrics-strip"></div>
             </div>
-            <div class="visualizer" id="visualizerRace" role="img" aria-label="Sorting visualization race pane"></div>
+            <div class="viz-body">
+              <div class="visualizer" id="visualizerRace" role="img" aria-label="Sorting visualization race pane"></div>
+              <div id="heatmapSecondary" class="heatmap-strip" aria-label="Per-index access frequency heatmap race pane"></div>
+            </div>
           </section>
         </div>
 
@@ -184,11 +237,22 @@
           <div class="legend-item"><span class="swatch write"></span> Writing</div>
           <div class="legend-item"><span class="swatch pivot"></span> Pivot (Quick Sort)</div>
           <div class="legend-item"><span class="swatch digit"></span> Digit pass (Radix)</div>
+          <div class="legend-item"><span class="swatch bucket"></span> Bucket (Counting)</div>
           <div class="legend-item"><span class="swatch gap"></span> Gap pair (Shell)</div>
           <div class="legend-item"><span class="swatch sorted"></span> Sorted</div>
         </section>
       </main>
     </div>
+  </div>
+
+  <div id="presentationOverlay" class="presentation-overlay hidden" role="dialog" aria-modal="true" aria-label="Presentation mode">
+    <div class="presentation-hud">
+      <span id="presentationAlgo" class="presentation-algo">Algorithm</span>
+      <span id="presentationMetrics" class="presentation-metrics"></span>
+      <button id="presentationExitBtn" class="btn btn-ghost btn-sm" type="button">Esc — Exit</button>
+    </div>
+    <div id="presentationVisualizer" class="presentation-visualizer"></div>
+    <div id="presentationHeatmap" class="presentation-heatmap"></div>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

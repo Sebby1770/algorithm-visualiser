@@ -2,6 +2,24 @@
 
 All notable changes to Sort Lab (Algorithm Visualizer).
 
+## [2026-07-05] — v4 Feature Expansion
+
+### Added
+- **Counting Sort** and **Cocktail Shaker Sort** — 9th and 10th algorithms with counting-array panel and bidirectional sweep visualization
+- **Access Heatmap** — per-index access frequency strip below each visualization pane
+- **Algorithm Recommender** — analyzes dataset sortedness and unique-value count; suggests best-fit algorithm with reasoning
+- **Quiz Mode** — hides algorithm name during run; guess grid after completion; score persisted in `localStorage`
+- **Presentation Mode** — fullscreen overlay with large bars, metrics HUD, and synced heatmap (Esc to exit)
+- **Share Run URL** — encodes algorithm, dataset, size, speed, and options in query string; restored on page load
+- **Learning Cards** — flip card per algorithm with trivia and real-world use cases
+- New legend swatch: **Bucket** (Counting Sort)
+
+### Changed
+- Algorithm count increased from 8 to 10
+- Benchmark Tournament runs all 10 algorithms
+- Run history records quiz-mode runs
+- Profile panel blurs algorithm name when Quiz Mode is enabled
+
 ## [2026-07-05] — v3 Massive Improvements
 
 ### Added

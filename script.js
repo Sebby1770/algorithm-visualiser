@@ -1,10 +1,11 @@
 /* ============================================================
-   Sorting Algorithm Lab v3
+   Sorting Algorithm Lab v4
    Vanilla JS — no frameworks
    ============================================================ */
 
 const ALGORITHM_IDS = [
   "bubble", "selection", "insertion", "merge", "quick", "heap", "shell", "radix",
+  "counting", "cocktail",
 ];
 
 // ---------- Algorithm metadata ----------
@@ -89,6 +90,69 @@ const ALGORITHM_PROFILES = {
     memory: "O(n + k)",
     description: "Sorts by individual digits using counting sort passes (LSD).",
   },
+  counting: {
+    name: "Counting Sort",
+    best: "O(n + k)",
+    avg: "O(n + k)",
+    worst: "O(n + k)",
+    stable: true,
+    inPlace: false,
+    memory: "O(k)",
+    description: "Counts occurrences of each value, then reconstructs the sorted array.",
+  },
+  cocktail: {
+    name: "Cocktail Shaker Sort",
+    best: "O(n)",
+    avg: "O(n²)",
+    worst: "O(n²)",
+    stable: true,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Bidirectional bubble sort — sweeps forward then backward each pass.",
+  },
+};
+
+const LEARNING_CARDS = {
+  bubble: {
+    trivia: "Bubble sort is one of the simplest algorithms taught in CS101 — yet it inspired early GPU sorting research.",
+    useCase: "Educational demos and tiny embedded lists where code size matters more than speed.",
+  },
+  selection: {
+    trivia: "Selection sort always makes exactly n−1 swaps, no matter the input order.",
+    useCase: "Flash memory systems where writes are expensive and minimizing swaps is critical.",
+  },
+  insertion: {
+    trivia: "Insertion sort is the algorithm behind Timsort's galloping merge for nearly-sorted runs.",
+    useCase: "Real-time online sorting — e.g. sorting a hand of playing cards as you receive them.",
+  },
+  merge: {
+    trivia: "Merge sort was invented by John von Neumann in 1945 for the EDVAC computer.",
+    useCase: "External sorting of massive datasets that don't fit in RAM (database indexes, log files).",
+  },
+  quick: {
+    trivia: "Tony Hoare invented Quick Sort at age 26 while on an exchange program in Moscow.",
+    useCase: "General-purpose in-memory sorting — used in C's qsort, Python's Timsort hybrid, and more.",
+  },
+  heap: {
+    trivia: "Heap sort guarantees O(n log n) without extra arrays — unlike merge sort.",
+    useCase: "Priority queues and real-time systems needing predictable worst-case performance.",
+  },
+  shell: {
+    trivia: "Donald Shell published Shell Sort in 1959 — it was the first algorithm to beat O(n²) in practice.",
+    useCase: "Medium-sized in-memory arrays where simplicity beats merge sort's overhead.",
+  },
+  radix: {
+    trivia: "Radix sort can sort integers faster than comparison-based sorts when the key range is bounded.",
+    useCase: "Sorting fixed-width integers — IP addresses, zip codes, and database column indexes.",
+  },
+  counting: {
+    trivia: "Counting sort is not comparison-based — it sidesteps the O(n log n) lower bound entirely.",
+    useCase: "Sorting exam scores (0–100), histograms, and vote tallies with a small value range.",
+  },
+  cocktail: {
+    trivia: "Cocktail shaker sort is also called bidirectional bubble sort or shaker sort.",
+    useCase: "Teaching bidirectional scanning — slightly better than bubble on reversed arrays.",
+  },
 };
 
 const DATASET_LABELS = {
@@ -102,6 +166,7 @@ const DATASET_LABELS = {
 };
 
 const HISTORY_KEY = "sortLabHistory";
+const QUIZ_SCORE_KEY = "sortLabQuizScore";
 const MAX_HISTORY = 8;
 
 // ---------- DOM references ----------
@@ -152,7 +217,122 @@ const dom = {
   comparisonPanel: $("comparisonPanel"),
   comparisonMatrix: $("comparisonMatrix"),
   a11yAnnouncer: $("a11yAnnouncer"),
+  shareUrlBtn: $("shareUrlBtn"),
+  presentationBtn: $("presentationBtn"),
+  quizMode: $("quizMode"),
+  quizScore: $("quizScore"),
+  quizPanel: $("quizPanel"),
+  quizGuessGrid: $("quizGuessGrid"),
+  quizFeedback: $("quizFeedback"),
+  recommenderContent: $("recommenderContent"),
+  learningCard: $("learningCard"),
+  learningTrivia: $("learningTrivia"),
+  learningUseCase: $("learningUseCase"),
+  heatmapPrimary: $("heatmapPrimary"),
+  heatmapSecondary: $("heatmapSecondary"),
+  countingArrayPanel: $("countingArrayPanel"),
+  countingArrayDisplay: $("countingArrayDisplay"),
+  panePrimaryLabel: $("panePrimaryLabel"),
+  presentationOverlay: $("presentationOverlay"),
+  presentationAlgo: $("presentationAlgo"),
+  presentationMetrics: $("presentationMetrics"),
+  presentationExitBtn: $("presentationExitBtn"),
+  presentationVisualizer: $("presentationVisualizer"),
+  presentationHeatmap: $("presentationHeatmap"),
 };
+
+// ---------- Dataset analysis & recommender ----------
+function analyzeDataset(arr) {
+  const n = arr.length;
+  const unique = new Set(arr).size;
+  let inversions = 0;
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (arr[i] > arr[j]) inversions++;
+    }
+  }
+
+  const maxInversions = (n * (n - 1)) / 2 || 1;
+  const sortedness = 1 - inversions / maxInversions;
+  const min = Math.min(...arr);
+  const max = Math.max(...arr);
+  const range = max - min + 1;
+
+  return { n, unique, inversions, sortedness, uniqueRatio: unique / n, min, max, range };
+}
+
+function recommendAlgorithm(arr) {
+  const stats = analyzeDataset(arr);
+
+  if (stats.sortedness > 0.92) {
+    return {
+      algorithm: "insertion",
+      reason: `Dataset is ${Math.round(stats.sortedness * 100)}% sorted — Insertion Sort runs in near O(n) time on already-ordered data.`,
+      stats,
+    };
+  }
+
+  if (stats.unique <= 12 && stats.range <= 100 && stats.n >= 15) {
+    return {
+      algorithm: "counting",
+      reason: `Only ${stats.unique} distinct values in a range of ${stats.range} — Counting Sort avoids comparisons entirely.`,
+      stats,
+    };
+  }
+
+  if (stats.uniqueRatio < 0.2 && stats.n >= 20) {
+    return {
+      algorithm: "radix",
+      reason: `Low cardinality (${stats.unique} unique / ${stats.n} elements) — Radix Sort distributes by digits efficiently.`,
+      stats,
+    };
+  }
+
+  if (stats.sortedness < 0.15) {
+    return {
+      algorithm: "merge",
+      reason: "Highly disordered (likely reversed) — Merge Sort guarantees O(n log n) regardless of input order.",
+      stats,
+    };
+  }
+
+  if (stats.n <= 25) {
+    return {
+      algorithm: "insertion",
+      reason: `Small array (n=${stats.n}) — Insertion Sort has low overhead and excellent cache locality.`,
+      stats,
+    };
+  }
+
+  return {
+    algorithm: "quick",
+    reason: "General-purpose random data — Quick Sort offers excellent average-case performance in practice.",
+    stats,
+  };
+}
+
+function heatmapColor(ratio) {
+  const low = getComputedStyle(document.documentElement).getPropertyValue("--heatmap-low").trim() || "#dbeafe";
+  const high = getComputedStyle(document.documentElement).getPropertyValue("--heatmap-high").trim() || "#dc2626";
+
+  const parse = (hex) => {
+    const h = hex.replace("#", "");
+    return [
+      parseInt(h.slice(0, 2), 16),
+      parseInt(h.slice(2, 4), 16),
+      parseInt(h.slice(4, 6), 16),
+    ];
+  };
+
+  const [r1, g1, b1] = parse(low.length === 7 ? low : "#dbeafe");
+  const [r2, g2, b2] = parse(high.length === 7 ? high : "#dc2626");
+  const t = Math.min(1, Math.max(0, ratio));
+  const r = Math.round(r1 + (r2 - r1) * t);
+  const g = Math.round(g1 + (g2 - g1) * t);
+  const b = Math.round(b1 + (b2 - b1) * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 // ---------- Dataset generators ----------
 function randomInt(min, max) {
@@ -390,12 +570,14 @@ class Metrics {
 
 // ---------- Sort runner (one visualization pane) ----------
 class SortRunner {
-  constructor({ container, metricsEl, label }) {
+  constructor({ container, metricsEl, heatmapEl, label }) {
     this.container = container;
     this.metricsEl = metricsEl;
+    this.heatmapEl = heatmapEl;
     this.label = label;
     this.array = [];
     this.bars = [];
+    this.accessCounts = [];
     this.metrics = new Metrics();
     this.paused = false;
     this.stopped = false;
@@ -408,11 +590,23 @@ class SortRunner {
     this.speedSlider = null;
     this.onNarrate = null;
     this.onOperation = null;
+    this.onVisualUpdate = null;
+    this.onCountingArrayUpdate = null;
     this.currentGap = 0;
     this.currentDigitExp = 1;
   }
 
-  configure({ audio, speedSlider, stepMode, silent = false, teachingMode = false, onNarrate, onOperation }) {
+  configure({
+    audio,
+    speedSlider,
+    stepMode,
+    silent = false,
+    teachingMode = false,
+    onNarrate,
+    onOperation,
+    onVisualUpdate,
+    onCountingArrayUpdate,
+  }) {
     this.audio = audio;
     this.speedSlider = speedSlider;
     this.stepMode = stepMode;
@@ -420,11 +614,15 @@ class SortRunner {
     this.teachingMode = teachingMode;
     this.onNarrate = onNarrate || null;
     this.onOperation = onOperation || null;
+    this.onVisualUpdate = onVisualUpdate || null;
+    this.onCountingArrayUpdate = onCountingArrayUpdate || null;
   }
 
   setArray(data) {
     this.array = [...data];
+    this.accessCounts = new Array(data.length).fill(0);
     this.renderBars();
+    this.renderHeatmap();
   }
 
   renderBars() {
@@ -442,8 +640,43 @@ class SortRunner {
 
   clearStateClasses() {
     this.bars.forEach((bar) => {
-      bar.classList.remove("compare", "swap", "sorted", "pivot", "write", "digit", "gap");
+      bar.classList.remove("compare", "swap", "sorted", "pivot", "write", "digit", "gap", "bucket");
     });
+  }
+
+  trackAccess(...indices) {
+    indices.forEach((i) => {
+      if (i >= 0 && i < this.accessCounts.length) {
+        this.accessCounts[i]++;
+      }
+    });
+  }
+
+  renderHeatmap() {
+    if (!this.heatmapEl || this.silent) return;
+
+    const n = this.array.length;
+    if (this.heatmapEl.children.length !== n) {
+      this.heatmapEl.innerHTML = "";
+      for (let i = 0; i < n; i++) {
+        const cell = document.createElement("div");
+        cell.className = "heatmap-cell";
+        cell.title = `Index ${i}: 0 accesses`;
+        this.heatmapEl.appendChild(cell);
+      }
+    }
+
+    const max = Math.max(...this.accessCounts, 1);
+    Array.from(this.heatmapEl.children).forEach((cell, i) => {
+      const count = this.accessCounts[i] || 0;
+      cell.style.background = heatmapColor(count / max);
+      cell.title = `Index ${i}: ${count} access${count === 1 ? "" : "es"}`;
+    });
+  }
+
+  notifyVisualUpdate() {
+    this.renderHeatmap();
+    this.onVisualUpdate?.(this);
   }
 
   narrate(message) {
@@ -510,6 +743,7 @@ class SortRunner {
 
   async compare(i, j) {
     this.metrics.comparisons++;
+    this.trackAccess(i, j);
     if (!this.silent) {
       this.bars[i]?.classList.add("compare");
       this.bars[j]?.classList.add("compare");
@@ -518,6 +752,7 @@ class SortRunner {
     this.updateMetricsDisplay();
     this.narrate(`Now comparing indices ${i} and ${j} (values ${this.array[i]} and ${this.array[j]}).`);
     this.recordOperation();
+    this.notifyVisualUpdate();
     await this.waitStep();
   }
 
@@ -529,6 +764,7 @@ class SortRunner {
   async swap(i, j) {
     this.metrics.swaps++;
     this.metrics.writes += 2;
+    this.trackAccess(i, j);
     [this.array[i], this.array[j]] = [this.array[j], this.array[i]];
     if (!this.silent) {
       this.bars[i].style.height = `${this.array[i]}%`;
@@ -540,6 +776,7 @@ class SortRunner {
     this.updateMetricsDisplay();
     this.narrate(`Swapping indices ${i} and ${j}.`);
     this.recordOperation();
+    this.notifyVisualUpdate();
     await this.waitStep();
     this.bars[i]?.classList.remove("swap");
     this.bars[j]?.classList.remove("swap");
@@ -547,6 +784,7 @@ class SortRunner {
 
   async write(i, value) {
     this.metrics.writes++;
+    this.trackAccess(i);
     this.array[i] = value;
     if (!this.silent) {
       this.bars[i].style.height = `${value}%`;
@@ -556,6 +794,7 @@ class SortRunner {
     this.updateMetricsDisplay();
     this.narrate(`Writing value ${value} to index ${i}.`);
     this.recordOperation();
+    this.notifyVisualUpdate();
     await this.waitStep();
     this.bars[i]?.classList.remove("write");
   }
@@ -565,8 +804,10 @@ class SortRunner {
   }
 
   async markPivot(i) {
+    this.trackAccess(i);
     this.bars[i]?.classList.add("pivot");
     this.narrate(`Pivot selected at index ${i} (value ${this.array[i]}).`);
+    this.notifyVisualUpdate();
     await this.waitStep();
   }
 
@@ -590,6 +831,8 @@ class SortRunner {
       heap: () => this.heapSort(),
       shell: () => this.shellSort(),
       radix: () => this.radixSort(),
+      counting: () => this.countingSort(),
+      cocktail: () => this.cocktailShakerSort(),
     };
 
     try {
@@ -885,6 +1128,99 @@ class SortRunner {
       }
     }
   }
+
+  async countingSort() {
+    const n = this.array.length;
+    const min = Math.min(...this.array);
+    const max = Math.max(...this.array);
+    const range = max - min + 1;
+    const count = new Array(range).fill(0);
+
+    this.narrate(`Counting sort: value range ${min}…${max} (${range} buckets).`);
+
+    for (let i = 0; i < n; i++) {
+      const bucket = this.array[i] - min;
+      this.trackAccess(i);
+      if (!this.silent) this.bars[i]?.classList.add("bucket");
+      count[bucket]++;
+      this.metrics.writes++;
+      this.onCountingArrayUpdate?.(count, min, max, bucket);
+      this.narrate(`Incrementing count for value ${this.array[i]} (bucket ${bucket}).`);
+      this.recordOperation();
+      this.notifyVisualUpdate();
+      await this.waitStep();
+      this.bars[i]?.classList.remove("bucket");
+    }
+
+    for (let i = 1; i < range; i++) {
+      count[i] += count[i - 1];
+      this.onCountingArrayUpdate?.(count, min, max, i);
+      this.narrate(`Prefix sum at bucket ${i}: cumulative count = ${count[i]}.`);
+      this.recordOperation();
+      await this.waitStep();
+    }
+
+    const output = new Array(n);
+    for (let i = n - 1; i >= 0; i--) {
+      const bucket = this.array[i] - min;
+      this.trackAccess(i);
+      const pos = count[bucket] - 1;
+      output[pos] = this.array[i];
+      count[bucket]--;
+      if (!this.silent) this.bars[i]?.classList.add("bucket");
+      this.onCountingArrayUpdate?.(count, min, max, bucket);
+      this.narrate(`Placing ${this.array[i]} at output position ${pos}.`);
+      this.recordOperation();
+      this.notifyVisualUpdate();
+      await this.waitStep();
+      this.bars[i]?.classList.remove("bucket");
+    }
+
+    for (let i = 0; i < n; i++) {
+      await this.write(i, output[i]);
+      if (!this.silent) {
+        this.bars[i]?.classList.add("bucket");
+        await this.waitStep();
+        this.bars[i]?.classList.remove("bucket");
+      }
+    }
+  }
+
+  async cocktailShakerSort() {
+    const n = this.array.length;
+    let start = 0;
+    let end = n - 1;
+
+    while (start < end) {
+      this.narrate(`Cocktail pass: scanning forward from ${start} to ${end}.`);
+
+      for (let i = start; i < end; i++) {
+        await this.compare(i, i + 1);
+        if (this.array[i] > this.array[i + 1]) {
+          await this.swap(i, i + 1);
+        }
+        this.clearCompare(i, i + 1);
+      }
+      this.markSorted(end);
+      end--;
+
+      if (start >= end) break;
+
+      this.narrate(`Cocktail pass: scanning backward from ${end} to ${start}.`);
+
+      for (let i = end; i > start; i--) {
+        await this.compare(i - 1, i);
+        if (this.array[i - 1] > this.array[i]) {
+          await this.swap(i - 1, i);
+        }
+        this.clearCompare(i - 1, i);
+      }
+      this.markSorted(start);
+      start++;
+    }
+
+    if (n > 0) this.markSorted(start);
+  }
 }
 
 // ---------- Application ----------
@@ -895,15 +1231,22 @@ class SortLabApp {
     this.primary = new SortRunner({
       container: dom.visualizer,
       metricsEl: dom.metricsPrimary,
+      heatmapEl: dom.heatmapPrimary,
       label: "Primary",
     });
     this.secondary = new SortRunner({
       container: dom.visualizerRace,
       metricsEl: dom.metricsSecondary,
+      heatmapEl: dom.heatmapSecondary,
       label: "Race",
     });
     this.baseArray = [];
     this.isRunning = false;
+    this.presentationActive = false;
+    this.presentationBars = [];
+    this.presentationHeatmapCells = [];
+    this.quizAnswer = null;
+    this.quizScore = this.loadQuizScore();
     this.lastRunSummary = null;
     this.lastTournamentResults = null;
     this.history = this.loadHistory();
@@ -912,12 +1255,20 @@ class SortLabApp {
   init() {
     this.initTheme();
     this.initSoundToggle();
+    this.loadFromUrl();
     this.bindEvents();
     this.updateProfile();
+    this.updateLearningCard();
+    this.updateQuizScoreDisplay();
     this.updateTeachingPanel();
     this.updateCustomFieldVisibility();
     this.renderHistory();
-    this.generateArray();
+    if (dom.dataset.value !== "custom") {
+      this.generateArray();
+    } else {
+      this.applyCustomArray();
+    }
+    this.updateRecommender();
     this.updateRaceVisibility();
     this.registerServiceWorker();
     this.setStatus("Ready — press S to start or G to generate");
@@ -951,7 +1302,10 @@ class SortLabApp {
       dom.speedValue.textContent = dom.speed.value;
     });
 
-    dom.algorithm.addEventListener("change", () => this.updateProfile());
+    dom.algorithm.addEventListener("change", () => {
+      this.updateProfile();
+      this.updateLearningCard();
+    });
     dom.raceMode.addEventListener("change", () => {
       this.updateRaceVisibility();
       dom.algorithmRace.disabled = !dom.raceMode.checked;
@@ -967,6 +1321,26 @@ class SortLabApp {
     });
 
     dom.teachingMode.addEventListener("change", () => this.updateTeachingPanel());
+
+    dom.quizMode.addEventListener("change", () => {
+      this.updateProfile();
+      if (!dom.quizMode.checked) {
+        dom.quizPanel.hidden = true;
+        dom.quizFeedback.textContent = "";
+      }
+    });
+
+    dom.learningCard.addEventListener("click", () => this.flipLearningCard());
+    dom.learningCard.addEventListener("keydown", (e) => {
+      if (e.code === "Enter" || e.code === "Space") {
+        e.preventDefault();
+        this.flipLearningCard();
+      }
+    });
+
+    dom.shareUrlBtn.addEventListener("click", () => this.copyShareUrl());
+    dom.presentationBtn.addEventListener("click", () => this.enterPresentation());
+    dom.presentationExitBtn.addEventListener("click", () => this.exitPresentation());
 
     dom.applyCustomBtn.addEventListener("click", () => this.applyCustomArray());
 
@@ -991,6 +1365,12 @@ class SortLabApp {
   }
 
   handleKeyboard(e) {
+    if (e.code === "Escape" && this.presentationActive) {
+      e.preventDefault();
+      this.exitPresentation();
+      return;
+    }
+
     if (e.target.matches("input, select, textarea")) return;
 
     switch (e.code) {
@@ -1046,6 +1426,8 @@ class SortLabApp {
     this.secondary.metrics.reset();
     this.primary.updateMetricsDisplay();
     this.secondary.updateMetricsDisplay();
+    this.updateRecommender();
+    this.hideCountingArrayPanel();
     this.setStatus(`Loaded custom array (${result.data.length} elements)`);
     this.announce(`Custom array loaded with ${result.data.length} elements.`);
   }
@@ -1068,6 +1450,9 @@ class SortLabApp {
     this.primary.updateMetricsDisplay();
     this.secondary.updateMetricsDisplay();
     this.opsChart.reset();
+    this.updateRecommender();
+    this.hideCountingArrayPanel();
+    dom.quizPanel.hidden = true;
     this.setStatus(`Generated ${DATASET_LABELS[type]} dataset (${size} elements)`);
   }
 
@@ -1088,9 +1473,12 @@ class SortLabApp {
 
   updateProfile() {
     const profile = ALGORITHM_PROFILES[dom.algorithm.value];
+    const quizActive = dom.quizMode.checked;
+    const hiddenName = quizActive ? "???" : profile.name;
+    dom.profilePanel.classList.toggle("quiz-hidden", quizActive);
     dom.profilePanel.innerHTML = `
-      <h3 class="profile-name">${profile.name}</h3>
-      <p class="profile-desc">${profile.description}</p>
+      <h3 class="profile-name">${hiddenName}</h3>
+      <p class="profile-desc">${quizActive ? "Algorithm hidden — watch the animation and guess!" : profile.description}</p>
       <dl class="profile-grid">
         <div><dt>Best</dt><dd>${profile.best}</dd></div>
         <div><dt>Average</dt><dd>${profile.avg}</dd></div>
@@ -1100,13 +1488,276 @@ class SortLabApp {
         <div><dt>Memory</dt><dd>${profile.memory}</dd></div>
       </dl>
     `;
+    if (quizActive) {
+      dom.panePrimaryLabel.textContent = "???";
+    } else {
+      dom.panePrimaryLabel.textContent = profile.name;
+    }
+  }
+
+  updateLearningCard() {
+    const card = LEARNING_CARDS[dom.algorithm.value];
+    if (!card) return;
+    dom.learningTrivia.textContent = card.trivia;
+    dom.learningUseCase.textContent = card.useCase;
+    dom.learningCard.classList.remove("flipped");
+  }
+
+  flipLearningCard() {
+    dom.learningCard.classList.toggle("flipped");
+  }
+
+  loadQuizScore() {
+    try {
+      const raw = localStorage.getItem(QUIZ_SCORE_KEY);
+      return raw ? JSON.parse(raw) : { correct: 0, total: 0 };
+    } catch {
+      return { correct: 0, total: 0 };
+    }
+  }
+
+  saveQuizScore() {
+    localStorage.setItem(QUIZ_SCORE_KEY, JSON.stringify(this.quizScore));
+    this.updateQuizScoreDisplay();
+  }
+
+  updateQuizScoreDisplay() {
+    dom.quizScore.textContent = `Score: ${this.quizScore.correct} / ${this.quizScore.total}`;
+  }
+
+  updateRecommender() {
+    if (!this.baseArray.length) {
+      dom.recommenderContent.innerHTML = '<p class="recommender-reason">Generate a dataset to see recommendations.</p>';
+      return;
+    }
+
+    const pick = recommendAlgorithm(this.baseArray);
+    const profile = ALGORITHM_PROFILES[pick.algorithm];
+    const { stats } = pick;
+
+    dom.recommenderContent.innerHTML = `
+      <p class="recommender-pick">${profile.name}</p>
+      <p class="recommender-reason">${pick.reason}</p>
+      <div class="recommender-stats">
+        <span class="recommender-stat">Sortedness: <strong>${Math.round(stats.sortedness * 100)}%</strong></span>
+        <span class="recommender-stat">Unique: <strong>${stats.unique}</strong></span>
+        <span class="recommender-stat">n: <strong>${stats.n}</strong></span>
+      </div>
+    `;
+  }
+
+  renderCountingArray(count, min, max, activeBucket = -1) {
+    const maxCount = Math.max(...count, 1);
+    dom.countingArrayPanel.classList.remove("hidden");
+    dom.countingArrayDisplay.innerHTML = "";
+
+    for (let v = min; v <= max; v++) {
+      const idx = v - min;
+      const cell = document.createElement("div");
+      cell.className = "counting-cell";
+
+      const bar = document.createElement("div");
+      bar.className = `counting-bar ${idx === activeBucket ? "active" : "inactive"}`;
+      bar.style.height = `${Math.max(8, (count[idx] / maxCount) * 40)}px`;
+
+      const label = document.createElement("span");
+      label.className = "counting-label";
+      label.textContent = v;
+
+      const value = document.createElement("span");
+      value.className = "counting-value";
+      value.textContent = count[idx];
+
+      cell.appendChild(bar);
+      cell.appendChild(label);
+      cell.appendChild(value);
+      dom.countingArrayDisplay.appendChild(cell);
+    }
+  }
+
+  hideCountingArrayPanel() {
+    dom.countingArrayPanel.classList.add("hidden");
+    dom.countingArrayDisplay.innerHTML = "";
+  }
+
+  buildShareUrl() {
+    const params = new URLSearchParams();
+    params.set("algo", dom.algorithm.value);
+    params.set("dataset", dom.dataset.value);
+    params.set("size", dom.size.value);
+    params.set("speed", dom.speed.value);
+    if (dom.raceMode.checked) {
+      params.set("race", "1");
+      params.set("raceAlgo", dom.algorithmRace.value);
+    }
+    if (dom.stepMode.checked) params.set("step", "1");
+    if (dom.teachingMode.checked) params.set("teach", "1");
+    if (dom.quizMode.checked) params.set("quiz", "1");
+    if (dom.dataset.value === "custom" && dom.customArray.value.trim()) {
+      params.set("data", dom.customArray.value.trim());
+    }
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+  }
+
+  loadFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.toString()) return;
+
+    if (params.has("algo") && ALGORITHM_PROFILES[params.get("algo")]) {
+      dom.algorithm.value = params.get("algo");
+    }
+    if (params.has("dataset") && DATASET_LABELS[params.get("dataset")]) {
+      dom.dataset.value = params.get("dataset");
+    }
+    if (params.has("size")) {
+      dom.size.value = params.get("size");
+      dom.sizeValue.textContent = params.get("size");
+    }
+    if (params.has("speed")) {
+      dom.speed.value = params.get("speed");
+      dom.speedValue.textContent = params.get("speed");
+    }
+    if (params.get("race") === "1") {
+      dom.raceMode.checked = true;
+      if (params.has("raceAlgo") && ALGORITHM_PROFILES[params.get("raceAlgo")]) {
+        dom.algorithmRace.value = params.get("raceAlgo");
+      }
+    }
+    dom.stepMode.checked = params.get("step") === "1";
+    dom.teachingMode.checked = params.get("teach") === "1";
+    dom.quizMode.checked = params.get("quiz") === "1";
+    if (params.has("data")) {
+      dom.dataset.value = "custom";
+      dom.customArray.value = params.get("data");
+    }
+  }
+
+  async copyShareUrl() {
+    const url = this.buildShareUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      this.showToast("Share URL copied");
+    } catch {
+      this.showToast("Copy failed");
+    }
+  }
+
+  enterPresentation() {
+    this.presentationActive = true;
+    dom.presentationOverlay.classList.remove("hidden");
+    document.body.classList.add("presentation-active");
+    this.initPresentationBars();
+    this.syncPresentation();
+  }
+
+  exitPresentation() {
+    this.presentationActive = false;
+    dom.presentationOverlay.classList.add("hidden");
+    document.body.classList.remove("presentation-active");
+    dom.presentationVisualizer.innerHTML = "";
+    dom.presentationHeatmap.innerHTML = "";
+    this.presentationBars = [];
+    this.presentationHeatmapCells = [];
+  }
+
+  initPresentationBars() {
+    const n = this.primary.array.length;
+    dom.presentationVisualizer.innerHTML = "";
+    dom.presentationHeatmap.innerHTML = "";
+    this.presentationBars = [];
+    this.presentationHeatmapCells = [];
+
+    for (let i = 0; i < n; i++) {
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      dom.presentationVisualizer.appendChild(bar);
+      this.presentationBars.push(bar);
+
+      const cell = document.createElement("div");
+      cell.className = "heatmap-cell";
+      dom.presentationHeatmap.appendChild(cell);
+      this.presentationHeatmapCells.push(cell);
+    }
+  }
+
+  syncPresentation(runner = this.primary) {
+    if (!this.presentationActive) return;
+
+    const profile = ALGORITHM_PROFILES[dom.algorithm.value];
+    const quizActive = dom.quizMode.checked && this.isRunning;
+    dom.presentationAlgo.textContent = quizActive ? "???" : profile.name;
+
+    const m = runner.metrics;
+    dom.presentationMetrics.textContent = `${m.comparisons} cmp · ${m.swaps} swp · ${m.writes} wrt · ${m.elapsedMs} ms`;
+
+    if (this.presentationBars.length !== runner.array.length) {
+      this.initPresentationBars();
+    }
+
+    const stateClasses = ["compare", "swap", "sorted", "pivot", "write", "digit", "gap", "bucket"];
+    const maxAccess = Math.max(...runner.accessCounts, 1);
+
+    runner.array.forEach((value, i) => {
+      const bar = this.presentationBars[i];
+      const heatCell = this.presentationHeatmapCells[i];
+      const sourceBar = runner.bars[i];
+
+      if (bar) {
+        bar.style.height = `${value}%`;
+        stateClasses.forEach((cls) => bar.classList.toggle(cls, sourceBar?.classList.contains(cls)));
+      }
+      if (heatCell) {
+        heatCell.style.background = heatmapColor((runner.accessCounts[i] || 0) / maxAccess);
+      }
+    });
+  }
+
+  showQuizPanel(correctAlgorithm) {
+    this.quizAnswer = correctAlgorithm;
+    dom.quizPanel.hidden = false;
+    dom.quizFeedback.textContent = "";
+    dom.quizGuessGrid.innerHTML = "";
+
+    ALGORITHM_IDS.forEach((id) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "quiz-guess-btn";
+      btn.textContent = ALGORITHM_PROFILES[id].name;
+      btn.addEventListener("click", () => this.handleQuizGuess(id, btn));
+      dom.quizGuessGrid.appendChild(btn);
+    });
+  }
+
+  handleQuizGuess(guess, btn) {
+    if (!this.quizAnswer) return;
+
+    const correct = guess === this.quizAnswer;
+    this.quizScore.total++;
+    if (correct) this.quizScore.correct++;
+    this.saveQuizScore();
+
+    dom.quizGuessGrid.querySelectorAll(".quiz-guess-btn").forEach((b) => {
+      b.disabled = true;
+      const id = ALGORITHM_IDS.find((aid) => ALGORITHM_PROFILES[aid].name === b.textContent);
+      if (id === this.quizAnswer) b.classList.add("correct");
+      else if (b === btn) b.classList.add("wrong");
+    });
+
+    const answerName = ALGORITHM_PROFILES[this.quizAnswer].name;
+    dom.quizFeedback.textContent = correct
+      ? `✓ Correct — it was ${answerName}!`
+      : `✗ Not quite — it was ${answerName}.`;
+    dom.quizFeedback.style.color = correct ? "var(--bar-sorted)" : "var(--bar-swap)";
+
+    this.updateProfile();
+    this.announce(correct ? "Quiz answer correct." : `Quiz answer incorrect. It was ${answerName}.`);
   }
 
   setControlsDisabled(disabled) {
     const ids = [
       "algorithm", "algorithmRace", "dataset", "size", "speed",
-      "raceMode", "stepMode", "teachingMode", "generateBtn", "startBtn",
-      "resetBtn", "tournamentBtn", "applyCustomBtn",
+      "raceMode", "stepMode", "teachingMode", "quizMode", "generateBtn", "startBtn",
+      "resetBtn", "tournamentBtn", "applyCustomBtn", "shareUrlBtn", "presentationBtn",
     ];
     ids.forEach((id) => {
       const el = dom[id];
@@ -1129,9 +1780,15 @@ class SortLabApp {
       teachingMode: teaching,
       onNarrate: (msg) => this.setTeaching(msg),
       onOperation: silent ? null : (total) => this.opsChart.push(total),
+      onVisualUpdate: silent ? null : (runner) => {
+        if (runner === this.primary) this.syncPresentation(runner);
+      },
+      onCountingArrayUpdate: silent
+        ? null
+        : (count, min, max, activeBucket) => this.renderCountingArray(count, min, max, activeBucket),
     };
     this.primary.configure(config);
-    this.secondary.configure({ ...config, onOperation: null });
+    this.secondary.configure({ ...config, onOperation: null, onCountingArrayUpdate: null });
     this.primary.paused = false;
     this.secondary.paused = false;
     this.primary.stopped = false;
@@ -1151,15 +1808,30 @@ class SortLabApp {
     const dataset = dom.dataset.value;
     const size = this.baseArray.length;
     const racing = dom.raceMode.checked;
+    const quizActive = dom.quizMode.checked && !racing;
+
+    if (quizActive) {
+      dom.quizPanel.hidden = true;
+      dom.quizFeedback.textContent = "";
+      this.updateProfile();
+    }
 
     this.secondary.setArray(this.baseArray);
     this.primary.setArray(this.baseArray);
+    this.hideCountingArrayPanel();
+
+    if (algoPrimary === "counting") {
+      dom.countingArrayPanel.classList.remove("hidden");
+    }
 
     const statusMsg = racing
       ? `Racing ${ALGORITHM_PROFILES[algoPrimary].name} vs ${ALGORITHM_PROFILES[algoRace].name}…`
-      : `Running ${ALGORITHM_PROFILES[algoPrimary].name}…`;
+      : quizActive
+        ? "Running sort — watch closely and guess the algorithm…"
+        : `Running ${ALGORITHM_PROFILES[algoPrimary].name}…`;
     this.setStatus(statusMsg);
     this.announce(statusMsg);
+    this.syncPresentation();
 
     try {
       if (racing) {
@@ -1173,7 +1845,7 @@ class SortLabApp {
 
       this.recordRun({
         timestamp: new Date().toISOString(),
-        mode: racing ? "race" : "single",
+        mode: racing ? "race" : quizActive ? "quiz" : "single",
         dataset,
         datasetLabel: DATASET_LABELS[dataset],
         size,
@@ -1191,17 +1863,27 @@ class SortLabApp {
           : null,
       });
 
-      this.setStatus("Sort complete");
-      this.announce("Sort complete.");
+      if (quizActive) {
+        this.showQuizPanel(algoPrimary);
+        this.setStatus("Sort complete — which algorithm was that?");
+        this.announce("Sort complete. Guess the algorithm.");
+      } else {
+        this.setStatus("Sort complete");
+        this.announce("Sort complete.");
+        this.updateProfile();
+      }
     } catch {
       this.setStatus("Sort stopped");
       this.announce("Sort stopped.");
+      this.updateProfile();
     } finally {
       this.isRunning = false;
       this.primary.paused = false;
       this.secondary.paused = false;
+      this.hideCountingArrayPanel();
       this.setControlsDisabled(false);
       this.updateCustomFieldVisibility();
+      this.syncPresentation();
     }
   }
 
@@ -1217,7 +1899,7 @@ class SortLabApp {
     const size = data.length;
     const results = [];
 
-    this.setStatus("Running benchmark tournament on all 8 algorithms…");
+    this.setStatus("Running benchmark tournament on all 10 algorithms…");
     this.announce("Benchmark tournament started.");
 
     for (const algo of ALGORITHM_IDS) {
@@ -1305,7 +1987,7 @@ class SortLabApp {
       expected = n2;
     } else if (profile.avg.includes("log")) {
       expected = nlogn;
-    } else if (profile.avg.includes("nk") || result.algorithm === "radix") {
+    } else if (profile.avg.includes("nk") || result.algorithm === "radix" || result.algorithm === "counting") {
       expected = n * 3;
     } else {
       expected = n;
@@ -1560,6 +2242,9 @@ class SortLabApp {
     dom.themeToggle.setAttribute("aria-pressed", next === "dark");
     localStorage.setItem("theme", next);
     this.opsChart.draw();
+    this.primary.renderHeatmap();
+    this.secondary.renderHeatmap();
+    if (this.presentationActive) this.syncPresentation();
   }
 
   setStatus(message) {

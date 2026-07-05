@@ -25,7 +25,10 @@
   --bar-pivot: #ec4899;
   --bar-digit: #06b6d4;
   --bar-gap: #f97316;
+  --bar-bucket: #14b8a6;
   --bar-sorted: #10b981;
+  --heatmap-low: #dbeafe;
+  --heatmap-high: #dc2626;
   --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
   --radius: 14px;
   --radius-sm: 8px;
@@ -56,7 +59,10 @@
   --bar-pivot: #f472b6;
   --bar-digit: #22d3ee;
   --bar-gap: #fb923c;
+  --bar-bucket: #2dd4bf;
   --bar-sorted: #34d399;
+  --heatmap-low: #1e3a5f;
+  --heatmap-high: #f87171;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
 
@@ -558,6 +564,7 @@ body.race-active .visualizer {
 .bar.pivot   { background: var(--bar-pivot); }
 .bar.digit   { background: var(--bar-digit); }
 .bar.gap     { background: var(--bar-gap); }
+.bar.bucket  { background: var(--bar-bucket); }
 .bar.sorted  { background: var(--bar-sorted); }
 
 /* ---------- Legend ---------- */
@@ -595,7 +602,325 @@ body.race-active .visualizer {
 .swatch.pivot   { background: var(--bar-pivot); }
 .swatch.digit   { background: var(--bar-digit); }
 .swatch.gap     { background: var(--bar-gap); }
+.swatch.bucket  { background: var(--bar-bucket); }
 .swatch.sorted  { background: var(--bar-sorted); }
+
+/* ---------- Viz body & heatmap ---------- */
+.viz-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.heatmap-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 14px;
+  padding: 0 1.25rem 0.65rem;
+  margin-top: -0.35rem;
+}
+
+.heatmap-cell {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--heatmap-low);
+  transition: background 0.12s ease;
+}
+
+/* ---------- Counting array panel ---------- */
+.counting-panel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem 0.75rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface-elevated);
+  overflow-x: auto;
+}
+
+.counting-panel.hidden {
+  display: none;
+}
+
+.counting-panel-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.counting-array {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 1;
+  min-height: 48px;
+}
+
+.counting-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 28px;
+}
+
+.counting-bar {
+  width: 100%;
+  min-width: 20px;
+  max-width: 36px;
+  background: var(--bar-bucket);
+  border-radius: 3px 3px 0 0;
+  transition: height 0.1s ease, opacity 0.1s ease;
+}
+
+.counting-bar.active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.counting-bar.inactive {
+  opacity: 0.35;
+}
+
+.counting-label {
+  font-size: 0.62rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+.counting-value {
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ---------- Recommender ---------- */
+.recommender-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.recommender-pick {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.recommender-reason {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.recommender-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.recommender-stat {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  padding: 0.25rem 0.45rem;
+  border-radius: 999px;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.recommender-stat strong {
+  color: var(--text);
+}
+
+/* ---------- Learning cards ---------- */
+.learning-card {
+  perspective: 800px;
+  cursor: pointer;
+  outline: none;
+}
+
+.learning-card:focus-visible .learning-card-inner {
+  box-shadow: 0 0 0 3px var(--primary);
+}
+
+.learning-card-inner {
+  position: relative;
+  min-height: 120px;
+  transform-style: preserve-3d;
+  transition: transform 0.5s ease;
+  border-radius: var(--radius-sm);
+}
+
+.learning-card.flipped .learning-card-inner {
+  transform: rotateY(180deg);
+}
+
+.learning-card-front,
+.learning-card-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--surface-elevated), var(--surface));
+}
+
+.learning-card-back {
+  transform: rotateY(180deg);
+  border-left: 3px solid var(--accent);
+}
+
+.learning-card-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.learning-card-text {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* ---------- Quiz mode ---------- */
+.quiz-score {
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  margin-top: 0.25rem;
+}
+
+.quiz-guess-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+}
+
+.quiz-guess-btn {
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.quiz-guess-btn:hover:not(:disabled) {
+  background: var(--secondary);
+  border-color: var(--primary);
+}
+
+.quiz-guess-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quiz-guess-btn.correct {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: var(--bar-sorted);
+}
+
+.quiz-guess-btn.wrong {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--bar-swap);
+}
+
+.quiz-feedback {
+  margin-top: 0.65rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  min-height: 1.25rem;
+}
+
+.quiz-hidden .profile-name {
+  filter: blur(6px);
+  user-select: none;
+}
+
+/* ---------- Presentation mode ---------- */
+.presentation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 2rem 2rem;
+}
+
+.presentation-overlay.hidden {
+  display: none;
+}
+
+.presentation-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.presentation-algo {
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.presentation-metrics {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.presentation-visualizer {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  min-height: 0;
+  padding: 1rem 0;
+}
+
+.presentation-visualizer .bar {
+  flex: 1;
+  max-width: 48px;
+  border-radius: 6px 6px 0 0;
+}
+
+.presentation-heatmap {
+  display: flex;
+  gap: 3px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 0.5rem;
+}
+
+.presentation-heatmap .heatmap-cell {
+  flex: 1;
+  max-width: 48px;
+  border-radius: 3px;
+}
+
+body.presentation-active {
+  overflow: hidden;
+}
 
 /* ---------- Teaching panel ---------- */
 .teaching-panel {
