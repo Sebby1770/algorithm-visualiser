@@ -1,6 +1,27 @@
 # Changelog
 
-All notable changes to Sort Lab (Algorithm Visualizer).
+All notable changes to Algorithm Lab (formerly Sort Lab).
+
+## [2026-07-11] — v5 Pathfinding Lab
+
+### Added
+- **Pathfinding mode** — a second visualizer alongside sorting, switchable via new topbar tabs
+- **Six pathfinding algorithms**: Breadth-First Search, Depth-First Search, Dijkstra's Algorithm, A* Search, Greedy Best-First, and Bidirectional BFS
+- **Interactive grid editor** — drag to draw walls, weighted cells (cost ×5), or erase; drag the start/goal markers; after a run the path re-solves live while dragging
+- **Maze & terrain generators** — recursive-division maze (guaranteed solvable), random scatter walls, and scattered weights
+- **Diagonal movement** option with octile heuristic and no corner-cutting
+- **Algorithm profile panel** — shortest-path guarantee, complexity, and weight-awareness badges per algorithm
+- **Live metrics** — visited cells, path steps, path cost, and compute time
+- **Pathfinding keyboard shortcuts**: `V` visualize · `C` clear path · `B` clear board · `M` maze
+- Three grid sizes (25×15, 37×21, 49×27) with full touch support
+
+### Changed
+- Rebranded **Sort Lab → Algorithm Lab**; PWA manifest, title, and README updated
+- Service worker cache bumped to v4 and now precaches `pathfinding.js`
+- Sorting keyboard shortcuts are scoped to sorting mode so the two modes don't clash
+
+### Fixed
+- `hidden` attribute on workspaces is now honored (explicit `display: none` override)
 
 ## [2026-07-05] — v4 Feature Expansion
 

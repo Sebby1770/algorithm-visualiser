@@ -1,12 +1,31 @@
-# Sort Lab — Sorting Algorithm Visualizer
+# Algorithm Lab — Sorting & Pathfinding Visualizer
 
-An interactive, animated sorting algorithm visualizer built with pure HTML, CSS, and vanilla JavaScript — no frameworks, no build step.
+An interactive, animated algorithm visualizer built with pure HTML, CSS, and vanilla JavaScript — no frameworks, no build step. Two labs in one app: **Sorting** and **Pathfinding**, switchable from the topbar.
 
-![Sort Lab](https://img.shields.io/badge/algorithms-8-blue) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
+![Algorithms](https://img.shields.io/badge/sorting_algorithms-10-blue) ![Pathfinding](https://img.shields.io/badge/pathfinding_algorithms-6-teal) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
 
-## Features
+## Pathfinding Lab
 
-### Algorithms (8)
+- **Six algorithms** — BFS, DFS, Dijkstra, A*, Greedy Best-First, Bidirectional BFS
+- **Interactive grid** — drag to draw walls or weighted terrain (cost ×5), drag the start/goal markers, and watch the path re-solve live after a run
+- **Mazes & terrain** — recursive-division maze (always solvable), random scatter, scattered weights
+- **Diagonal movement** option (octile heuristic, no corner-cutting)
+- **Per-algorithm profile** — shortest-path guarantee, complexity, weight-awareness
+- **Live metrics** — visited cells, path steps, path cost, compute time
+- Shortcuts: `V` visualize · `C` clear path · `B` clear board · `M` maze
+
+| Algorithm | Weighted | Shortest path | Complexity |
+|-----------|----------|---------------|------------|
+| BFS | No | ✅ (unweighted) | O(V + E) |
+| DFS | No | ❌ | O(V + E) |
+| Dijkstra | Yes | ✅ | O((V + E) log V) |
+| A* | Yes | ✅ | O((V + E) log V) |
+| Greedy Best-First | Yes | ❌ | O((V + E) log V) |
+| Bidirectional BFS | No | ✅ (unweighted) | O(V + E) |
+
+## Sorting Lab
+
+### Algorithms (10)
 - Bubble Sort
 - Selection Sort
 - Insertion Sort
@@ -15,6 +34,8 @@ An interactive, animated sorting algorithm visualizer built with pure HTML, CSS,
 - Heap Sort
 - **Shell Sort** — gap-based insertion with diminishing gaps
 - **Radix Sort** — LSD digit passes with bucket visualization
+- **Counting Sort** — counting-array panel visualization
+- **Cocktail Shaker Sort** — bidirectional bubble sweep
 
 ### Dataset Generators
 | Type | Description |
@@ -53,9 +74,10 @@ An interactive, animated sorting algorithm visualizer built with pure HTML, CSS,
 
 ```
 algorithm-visualiser/
-├── index.html      # Lab UI layout
-├── style.css       # Theming, sidebar, race mode, responsive
-├── script.js       # Algorithms, metrics, race mode, tournament, teaching
+├── index.html      # Lab UI layout (sorting + pathfinding views)
+├── style.css       # Theming, sidebar, race mode, pathfinding grid, responsive
+├── script.js       # Sorting: algorithms, metrics, race mode, tournament, teaching
+├── pathfinding.js  # Pathfinding: grid editor, 6 algorithms, mazes, live re-path
 ├── sw.js           # Service worker for offline caching
 ├── manifest.json   # PWA manifest
 ├── CHANGELOG.md    # Version history

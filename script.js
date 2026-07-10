@@ -1365,6 +1365,7 @@ class SortLabApp {
   }
 
   handleKeyboard(e) {
+    if (document.body.dataset.mode === "path") return;
     if (e.code === "Escape" && this.presentationActive) {
       e.preventDefault();
       this.exitPresentation();

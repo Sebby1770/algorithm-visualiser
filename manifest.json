@@ -1,7 +1,7 @@
 {
-  "name": "Sort Lab — Algorithm Visualizer",
-  "short_name": "Sort Lab",
-  "description": "Interactive sorting algorithm visualizer with 8 algorithms, teaching mode, tournament benchmarks, and offline support.",
+  "name": "Algorithm Lab — Sorting & Pathfinding Visualizer",
+  "short_name": "Algorithm Lab",
+  "description": "Interactive algorithm visualizer: 10 sorting algorithms with race, quiz, and tournament modes, plus a pathfinding lab with BFS, DFS, Dijkstra, A*, and mazes. Offline-capable.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1220",

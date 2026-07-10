@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Interactive sorting algorithm visualizer with race mode, quiz mode, teaching mode, tournament benchmarks, and offline support." />
+  <meta name="description" content="Interactive algorithm visualizer: 10 sorting algorithms with race, quiz, and tournament modes, plus a pathfinding lab with BFS, DFS, Dijkstra, A*, and mazes. Offline-capable PWA." />
   <meta name="theme-color" content="#0b1220" />
-  <title>Sort Lab — Algorithm Visualizer</title>
+  <title>Algorithm Lab — Sorting &amp; Pathfinding Visualizer</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -15,10 +15,14 @@
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">⚗</span>
         <div>
-          <h1>Sort Lab</h1>
+          <h1>Algorithm Lab</h1>
           <p class="brand-sub">Sorting Algorithm Visualizer</p>
         </div>
       </div>
+      <nav class="mode-tabs" role="tablist" aria-label="Visualizer mode">
+        <button id="modeSortBtn" class="mode-tab active" type="button" role="tab" aria-selected="true">Sorting</button>
+        <button id="modePathBtn" class="mode-tab" type="button" role="tab" aria-selected="false">Pathfinding</button>
+      </nav>
       <div class="topbar-actions">
         <button id="shareUrlBtn" class="btn btn-ghost btn-sm" type="button" title="Copy shareable URL">🔗 Share</button>
         <button id="presentationBtn" class="btn btn-ghost btn-sm" type="button" title="Presentation mode (Esc to exit)">🖥 Present</button>
@@ -30,7 +34,7 @@
       </div>
     </header>
 
-    <div class="workspace">
+    <div class="workspace" id="sortWorkspace">
       <aside class="sidebar">
         <section class="panel">
           <h2 class="panel-title">Controls</h2>
@@ -243,6 +247,108 @@
         </section>
       </main>
     </div>
+
+    <div class="workspace" id="pathWorkspace" hidden>
+      <aside class="sidebar">
+        <section class="panel">
+          <h2 class="panel-title">Pathfinding Controls</h2>
+
+          <div class="field">
+            <label for="pfAlgorithm">Algorithm</label>
+            <select id="pfAlgorithm">
+              <option value="bfs">Breadth-First Search</option>
+              <option value="dfs">Depth-First Search</option>
+              <option value="dijkstra">Dijkstra's Algorithm</option>
+              <option value="astar" selected>A* Search</option>
+              <option value="greedy">Greedy Best-First</option>
+              <option value="bibfs">Bidirectional BFS</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="pfBrush">Draw Tool</label>
+            <select id="pfBrush">
+              <option value="wall">Wall (impassable)</option>
+              <option value="weight">Weight (cost ×5)</option>
+              <option value="erase">Eraser</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="pfGridSize">Grid Size</label>
+            <select id="pfGridSize">
+              <option value="small">Small (25 × 15)</option>
+              <option value="medium" selected>Medium (37 × 21)</option>
+              <option value="large">Large (49 × 27)</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="pfSpeed">Speed: <span id="pfSpeedValue">60</span></label>
+            <input type="range" id="pfSpeed" min="1" max="100" value="60" />
+          </div>
+
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="pfDiagonal" />
+              <span>Allow diagonal movement</span>
+            </label>
+          </div>
+
+          <div class="btn-grid">
+            <button id="pfVisualizeBtn" class="btn btn-primary" title="Shortcut: V">Visualize</button>
+            <button id="pfClearPathBtn" class="btn btn-secondary" title="Shortcut: C">Clear Path</button>
+            <button id="pfClearBoardBtn" class="btn btn-danger" title="Shortcut: B">Clear Board</button>
+          </div>
+
+          <div class="field">
+            <label for="pfMazeType">Maze / Terrain</label>
+            <select id="pfMazeType">
+              <option value="division">Recursive Division Maze</option>
+              <option value="scatter">Random Scatter Walls</option>
+              <option value="weights">Scattered Weights</option>
+            </select>
+            <button id="pfMazeBtn" type="button" class="btn btn-accent btn-full" title="Shortcut: M">🧱 Generate Maze</button>
+          </div>
+
+          <p class="shortcut-hint">V visualize · C clear path · B clear board · M maze</p>
+        </section>
+
+        <section class="panel" id="pfProfile" aria-live="polite"></section>
+
+        <section class="panel">
+          <h2 class="panel-title">How to Use</h2>
+          <p class="panel-sub">
+            Drag on the grid to draw with the selected tool. Drag the <strong>start</strong> or
+            <strong>goal</strong> marker to move it — after a run, the path re-solves live as you drag.
+            Weighted cells cost ×5 to enter: compare Dijkstra or A* (weight-aware) against BFS (weight-blind).
+          </p>
+        </section>
+      </aside>
+
+      <main class="main-stage">
+        <p id="pfStatus" class="status-bar" aria-live="polite" role="status">Ready</p>
+
+        <section class="viz-pane">
+          <div class="pane-header">
+            <h3>Grid</h3>
+            <div id="pfMetrics" class="metrics-strip"></div>
+          </div>
+          <div class="pf-grid-wrap">
+            <div id="pfGrid" class="pf-grid" role="img" aria-label="Pathfinding grid visualization"></div>
+          </div>
+        </section>
+
+        <section class="legend">
+          <div class="legend-item"><span class="swatch pf-start"></span> Start</div>
+          <div class="legend-item"><span class="swatch pf-end"></span> Goal</div>
+          <div class="legend-item"><span class="swatch pf-wall"></span> Wall</div>
+          <div class="legend-item"><span class="swatch pf-weight"></span> Weight (×5)</div>
+          <div class="legend-item"><span class="swatch pf-visited"></span> Visited</div>
+          <div class="legend-item"><span class="swatch pf-path"></span> Shortest path</div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <div id="presentationOverlay" class="presentation-overlay hidden" role="dialog" aria-modal="true" aria-label="Presentation mode">
@@ -259,5 +365,6 @@
   <div id="a11yAnnouncer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
 
   <script src="script.js"></script>
+  <script src="pathfinding.js"></script>
 </body>
 </html>
