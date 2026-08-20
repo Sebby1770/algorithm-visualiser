@@ -1,7 +1,7 @@
 {
-  "name": "Sort Lab — Algorithm Visualizer",
-  "short_name": "Sort Lab",
-  "description": "Interactive sorting algorithm visualizer with 8 algorithms, teaching mode, tournament benchmarks, and offline support.",
+  "name": "Algo Lab — Sorting & Pathfinding",
+  "short_name": "Algo Lab",
+  "description": "Interactive algorithm lab with 10 sorting algorithms and 6 pathfinding algorithms, teaching mode, tournaments, and offline support.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1220",

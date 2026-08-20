@@ -1,105 +1,39 @@
-# Sort Lab — Sorting Algorithm Visualizer
+# Algo Lab — Sorting & Pathfinding Visualizer
 
-An interactive, animated sorting algorithm visualizer built with pure HTML, CSS, and vanilla JavaScript — no frameworks, no build step.
+An interactive teaching lab built with pure HTML, CSS, and vanilla JavaScript — no frameworks, no build step, no npm runtime dependencies.
 
-![Sort Lab](https://img.shields.io/badge/algorithms-8-blue) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
+Two labs share the same chrome, theme, and sound toggle:
 
-## Features
+- **Sort Lab** (`index.html`) — 10 sorting algorithms
+- **Path Lab** (`pathfinding.html`) — 6 pathfinding algorithms + maze generators
 
-### Algorithms (8)
-- Bubble Sort
-- Selection Sort
-- Insertion Sort
-- Merge Sort
-- Quick Sort
-- Heap Sort
-- **Shell Sort** — gap-based insertion with diminishing gaps
-- **Radix Sort** — LSD digit passes with bucket visualization
-
-### Dataset Generators
-| Type | Description |
-|------|-------------|
-| Random | Uniform random values |
-| Sorted | Already ascending |
-| Nearly Sorted | Sorted with ~5% random swaps |
-| Reversed | Descending order |
-| Few Unique | Limited distinct values |
-| Sawtooth | Repeating triangular pattern |
-| **Custom Input** | Paste comma-separated values or a JSON array |
-
-### Metrics & Controls
-- Live **comparisons**, **swaps**, **writes**, and **elapsed ms**
-- **Pause / Resume** and **Stop** during a run
-- **Step Mode** — advance one operation at a time with **Next Step**
-- **Algorithm Race** — run two algorithms side-by-side on identical data
-- **Teaching Mode** — narrated step explanations in a live panel
-- **Operations Chart** — sparkline of cumulative operations during a run
-- **Benchmark Tournament** — run all 8 algorithms; ranked leaderboard + comparison matrix
-
-### UI & UX
-- Modern **lab aesthetic** with sidebar controls and main visualization stage
-- **Algorithm profile panel** — Big-O best/avg/worst, stable?, in-place?, memory
-- **Run history** — last 8 runs saved to `localStorage`
-- **Export CSV** and **Copy Summary** for run data
-- **Dark mode** toggle (preference saved)
-- **Sound toggle** — Web Audio beeps on compare/swap/write
-- **Keyboard shortcuts**: `Space` pause · `S` start · `G` generate · `R` reset
-- **Responsive** layout for mobile and desktop
-- **Color legend** including pivot, write, digit-pass, and gap-pair states
-- **PWA manifest** + **service worker** for installable, offline-capable app
-- **Accessibility** — `aria-live` regions for status and teaching narration
-
-## File Structure
-
-```
-algorithm-visualiser/
-├── index.html      # Lab UI layout
-├── style.css       # Theming, sidebar, race mode, responsive
-├── script.js       # Algorithms, metrics, race mode, tournament, teaching
-├── sw.js           # Service worker for offline caching
-├── manifest.json   # PWA manifest
-├── CHANGELOG.md    # Version history
-└── README.md       # This file
-```
+![Algorithms](https://img.shields.io/badge/sort-10-blue) ![Pathfinding](https://img.shields.io/badge/path-6-indigo) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
 
 ## Running
 
-No build tools or dependencies. Open `index.html` in any modern browser:
+No build tools. Open the files in a modern browser, or serve locally (recommended for the service worker / PWA):
 
 ```bash
-# macOS
-open index.html
-
-# Linux
-xdg-open index.html
-
-# Or serve locally (recommended for PWA + service worker)
 python3 -m http.server
-# → http://localhost:8000
+# → http://localhost:8000          Sort Lab
+# → http://localhost:8000/pathfinding.html   Path Lab
 ```
 
-> **Note:** The service worker requires serving over HTTP(S). Opening `index.html` directly may not register the worker.
+macOS: `open index.html` · Linux: `xdg-open index.html`
 
-## How It Works
+> **Note:** The service worker requires HTTP(S). Opening a file directly may not register it.
 
-Each sorting algorithm runs inside a `SortRunner` class. Between every comparison, swap, or write, the runner `await`s a delay tied to the speed slider (or waits for **Next Step** in step mode). CSS classes drive bar colors; metrics update in real time.
+## Tests
 
-**Teaching Mode** hooks into each operation and narrates what's happening. **Benchmark Tournament** runs algorithms in silent mode (no animation) for fast head-to-head timing.
+Pathfinding algorithms and maze generators are covered by Node’s built-in test runner (no packages to install):
 
-### Color Legend
+```bash
+node --test tests/pathfinding.test.js
+```
 
-| Color | Meaning |
-|-------|---------|
-| Blue | Unsorted element |
-| Amber | Currently comparing |
-| Red | Being swapped |
-| Purple | Value written (Merge Sort) |
-| Pink | Pivot element (Quick Sort) |
-| Cyan | Digit pass (Radix Sort) |
-| Orange | Gap pair (Shell Sort) |
-| Green | In final sorted position |
+## Sort Lab
 
-## Algorithm Complexity
+### Algorithms (10)
 
 | Algorithm | Best | Average | Worst | Stable | In-place | Memory |
 |-----------|------|---------|-------|--------|----------|--------|
@@ -111,30 +45,97 @@ Each sorting algorithm runs inside a `SortRunner` class. Between every compariso
 | Heap | O(n log n) | O(n log n) | O(n log n) | No | Yes | O(1) |
 | Shell | O(n log n) | O(n^4/3) | O(n²) | No | Yes | O(1) |
 | Radix | O(nk) | O(nk) | O(nk) | Yes | No | O(n + k) |
+| Counting | O(n + k) | O(n + k) | O(n + k) | Yes | No | O(k) |
+| Cocktail Shaker | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
 
-## Controls
+### Dataset generators
 
-| Control | Purpose |
-|---------|---------|
-| Algorithm | Primary sort to run |
-| Algorithm Race | Enable dual-pane race mode |
-| Race Algorithm | Second algorithm for race mode |
-| Dataset | Input data pattern (or Custom Input) |
-| Custom Array | Paste values when Custom Input selected |
-| Array Size | Number of bars (10–120) |
-| Speed | Animation speed (1 = slow, 100 = fast) |
-| Step Mode | Manual single-step advance |
-| Teaching Mode | Narrated step explanations |
-| Generate / Reset | Create new dataset |
-| Start | Begin sorting |
-| Pause / Resume | Halt or continue animation |
-| Stop | Abort current run |
-| Next Step | Advance one step (step mode only) |
-| 🏆 Benchmark Tournament | Run all 8 algorithms; show leaderboard |
-| Export CSV | Download run history as CSV |
-| Copy Summary | Copy last run summary to clipboard |
-| 🔊 Sound | Toggle audio feedback |
-| 🌙 / ☀️ | Toggle dark/light theme |
+Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custom Input (comma-separated or JSON)
+
+### Features
+
+- Live comparisons, swaps, writes, and elapsed ms
+- Pause / Resume, Stop, and Step Mode
+- Algorithm Race (dual pane)
+- Teaching Mode (narrated steps)
+- Quiz Mode (guess the algorithm)
+- Presentation Mode
+- Access heatmap + operations sparkline
+- Algorithm recommender
+- Benchmark tournament (all 10) with comparison matrix
+- Learning cards (trivia + use cases)
+- Run history (last 8, `localStorage` key `sortLabHistory`)
+- Share URL, CSV export, copy summary
+- Keyboard: `Space` pause · `S` start · `G` generate · `R` reset · `Esc` exit present
+
+## Path Lab
+
+### Algorithms (6)
+
+| Algorithm | Time | Weighted | Complete | Optimal | Heuristic |
+|-----------|------|----------|----------|---------|-----------|
+| BFS | O(V + E) | No | Yes | Unweighted shortest | None |
+| DFS | O(V + E) | No | Yes | No | None |
+| Dijkstra | O((V + E) log V) | Yes | Yes | Yes (non-negative) | None |
+| A* | O((V + E) log V) | Yes | Yes | Yes (admissible h) | Manhattan / Euclidean if diagonal |
+| Greedy Best-First | O((V + E) log V) | No | Yes | No | Manhattan / Euclidean if diagonal |
+| Bidirectional BFS | O(V + E) | No | Yes | Unweighted shortest | None |
+
+Path cost is the sum of cell weights along the path **excluding start, including end**. Empty cells weigh `1`; weight cells weigh `5`. BFS / DFS / bidirectional BFS treat every step as cost 1 when *searching*, but reported path cost still uses actual weights.
+
+### Maze generators
+
+| Generator | Notes |
+|-----------|--------|
+| Empty | Open grid, start left-center, end right-center |
+| Recursive Backtracker | Perfect maze (DFS carve); start top-left, end bottom-right |
+| Prim | Perfect-ish carve via random frontier |
+| Recursive Division | Adds walls with one gap per divider |
+| Binary Tree | South/east biased corridors |
+| Scatter Walls | Random walls (start/end stay free) |
+
+Carved mazes prefer even/even passage cells. Even dimensions get a short corridor so the bottom-right corner stays reachable. All maze helpers **return a new grid** and never mutate an input.
+
+### Features
+
+- Interactive grid: drag to paint **Wall / Weight / Erase**; drag **S** / **E** to move terminals
+- Diagonal movement toggle (no corner-cutting through walls)
+- Race mode + algorithm tournament (rank: path cost → nodes expanded → time)
+- Teaching Mode, Step Mode, pause / resume / stop
+- Algorithm profile + learning cards
+- Run history (last 8, `localStorage` key `pathLabHistory`)
+- Share URL encodes algorithm, maze, rows, cols, speed, diagonal
+- Keyboard: `Space` pause · `S` start · `G` maze · `R` reset · `C` clear path · `Esc` stop · `1` wall · `2` weight · `3` erase
+
+Glyphs (not color alone): **S** start, **E** end, **●** weight.
+
+## Shared UI
+
+- Lab switcher in the top bar: Sort Lab ↔ Path Lab
+- Dark / light theme — `localStorage` key `theme` (shared)
+- Sound beeps (Web Audio) — `localStorage` key `sound` (shared)
+- PWA manifest + service worker (`algo-lab-v5`) for offline use
+- `aria-live` status and teaching narration
+
+## File structure
+
+```
+algorithm-visualiser/
+├── index.html              # Sort Lab
+├── pathfinding.html        # Path Lab
+├── style.css               # Shared theme + path grid
+├── script.js               # Sort Lab app
+├── pathfinding.js          # Path Lab UI
+├── pathfinding-core.js     # Search + mazes (browser + Node)
+├── tests/pathfinding.test.js
+├── sw.js                   # Service worker
+├── manifest.json           # PWA manifest
+├── CHANGELOG.md
+├── LICENSE                 # MIT
+└── README.md
+```
+
+`pathfinding-core.js` exports `PathCore` in the browser and `module.exports` in Node.
 
 ## License
 

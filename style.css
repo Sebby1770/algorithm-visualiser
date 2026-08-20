@@ -34,6 +34,14 @@
   --radius-sm: 8px;
   --sidebar-width: 320px;
   --font-mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  --path-empty: #f1f5f9;
+  --path-wall: #1e293b;
+  --path-start: #34d399;
+  --path-end: #f87171;
+  --path-weight: #fbbf24;
+  --path-visited: #93c5fd;
+  --path-frontier: #c4b5fd;
+  --path-path: #f59e0b;
 }
 
 [data-theme="dark"] {
@@ -64,6 +72,14 @@
   --heatmap-low: #1e3a5f;
   --heatmap-high: #f87171;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --path-empty: #1a2540;
+  --path-wall: #020617;
+  --path-start: #34d399;
+  --path-end: #f87171;
+  --path-weight: #f59e0b;
+  --path-visited: #1d4ed8;
+  --path-frontier: #6d28d9;
+  --path-path: #fbbf24;
 }
 
 * {
@@ -101,6 +117,7 @@ body {
   position: sticky;
   top: 0;
   z-index: 20;
+  flex-wrap: wrap;
 }
 
 .brand {
@@ -130,6 +147,44 @@ body {
 .brand-sub {
   font-size: 0.8rem;
   color: var(--text-muted);
+}
+
+.topbar-start {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.lab-switcher {
+  display: inline-flex;
+  padding: 0.18rem;
+  gap: 0.15rem;
+  background: var(--secondary);
+  border-radius: 999px;
+}
+
+.lab-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.38rem 0.85rem;
+  border-radius: 999px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.lab-pill:hover {
+  color: var(--text);
+}
+
+.lab-pill.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
 }
 
 .topbar-actions {
@@ -237,7 +292,8 @@ body {
   margin-bottom: 0.85rem;
 }
 
-.field label {
+.field label,
+.field-legend {
   font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -1112,4 +1168,134 @@ body.presentation-active {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .lab-switcher {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ---------- Brush pills ---------- */
+.brush-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.brush-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.brush-pill input {
+  accent-color: var(--primary);
+}
+
+.brush-pill:has(input:checked) {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* ---------- Pathfinding grid ---------- */
+.path-grid-wrap {
+  padding: 0.75rem;
+  overflow: auto;
+}
+
+.path-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--path-cols, 41), minmax(0, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  user-select: none;
+  touch-action: none;
+  max-width: 100%;
+}
+
+.path-cell {
+  aspect-ratio: 1;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: var(--path-empty);
+  color: var(--text);
+  font-size: clamp(0.42rem, 1.3vw, 0.72rem);
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.path-cell.is-wall {
+  background: var(--path-wall);
+}
+
+.path-cell.is-weight {
+  background: var(--path-weight);
+  color: #1f2937;
+}
+
+.path-cell.is-weight.is-visited:not(.is-path):not(.is-start):not(.is-end),
+.path-cell.is-weight.is-frontier:not(.is-path):not(.is-start):not(.is-end) {
+  color: #fff;
+}
+
+.path-cell.is-visited:not(.is-start):not(.is-end):not(.is-path) {
+  background: var(--path-visited);
+}
+
+.path-cell.is-frontier:not(.is-start):not(.is-end):not(.is-path) {
+  background: var(--path-frontier);
+}
+
+.path-cell.is-path:not(.is-start):not(.is-end) {
+  background: var(--path-path);
+  color: #1f2937;
+}
+
+.path-cell.is-start {
+  background: var(--path-start);
+  color: #052e16;
+  cursor: grab;
+}
+
+.path-cell.is-end {
+  background: var(--path-end);
+  color: #fff;
+  cursor: grab;
+}
+
+.path-cell:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.swatch.path-empty { background: var(--path-empty); border: 1px solid var(--border); }
+.swatch.path-wall { background: var(--path-wall); }
+.swatch.path-start { background: var(--path-start); }
+.swatch.path-end { background: var(--path-end); }
+.swatch.path-weight { background: var(--path-weight); }
+.swatch.path-frontier { background: var(--path-frontier); }
+.swatch.path-visited { background: var(--path-visited); }
+.swatch.path-path { background: var(--path-path); }
+
+body.race-active .path-cell {
+  font-size: clamp(0.38rem, 1vw, 0.65rem);
 }

@@ -1,6 +1,26 @@
 # Changelog
 
-All notable changes to Sort Lab (Algorithm Visualizer).
+All notable changes to Algo Lab (Algorithm Visualizer).
+
+## [2026-08-20] — v5 Path Lab
+
+### Added
+- **Path Lab** — second teaching lab for grid pathfinding (`pathfinding.html`)
+- Six search algorithms: **BFS**, **DFS**, **Dijkstra**, **A\***, **Greedy Best-First**, **Bidirectional BFS**
+- Maze generators: Recursive Backtracker, Prim, Recursive Division, Binary Tree, Scatter Walls
+- Interactive grid: wall / weight / erase brushes, draggable start & end, diagonal movement
+- Path Lab race mode, teaching mode, step mode, tournament (ranked by path cost, then nodes, then time)
+- Algorithm profiles, learning cards, run history (`pathLabHistory`)
+- Share URL for Path Lab (algorithm, maze, rows, cols, speed, diagonal)
+- Node tests: `node --test tests/pathfinding.test.js`
+- Lab switcher linking Sort Lab ↔ Path Lab on both pages
+
+### Changed
+- Product branding is now **Algo Lab** (Sort Lab + Path Lab)
+- Page titles: “Algo Lab — Sorting Visualizer” / “Algo Lab — Pathfinding Visualizer”
+- PWA name is “Algo Lab”; service worker cache bumped to `algo-lab-v5`
+- Theme (`theme`) and sound (`sound`) stay shared across both labs
+- README covers 10 sorting algorithms and the new pathfinding lab
 
 ## [2026-07-05] — v4 Feature Expansion
 
