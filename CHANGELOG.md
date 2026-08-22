@@ -2,6 +2,30 @@
 
 All notable changes to Algo Lab (Algorithm Visualizer).
 
+## [2026-08-22] — v6 Sorting Core
+
+### Added
+- **Four new sorting algorithms**: Comb Sort, Gnome Sort, Cycle Sort (provably minimal
+  writes — great for the writes metric), and a simplified TimSort (insertion-sorted
+  minruns + merge passes with the already-ordered shortcut)
+- **`sorting-core.js`** — every sorting algorithm now lives in one dependency-free
+  module as a pure step generator (works in the browser as `SortCore` and in Node via
+  `require`). The page, the tests, and the profiler all consume the same op stream.
+- **Complexity Profiler** — one click benchmarks all 14 algorithms at
+  n = 16, 32, 64, 128, 256, 512 on the current dataset shape, draws a log-log chart,
+  and reports each algorithm's measured growth exponent next to its theoretical class
+- **47 sorting unit tests** (`node --test tests/sorting.test.js`): correctness on every
+  dataset shape and edge case, stability proofs via tagged keys, cycle sort's ≤ n write
+  bound and zero-writes-on-sorted property, exact bubble counts on reversed input, and
+  exponent-estimator checks that separate the quadratic sorts from the linearithmic ones
+
+### Changed
+- `SortRunner` no longer hardcodes algorithm logic — it animates the `SortCore`
+  operation stream (compare / swap / write / touch / counts / mark ops), which keeps
+  metrics, narration, heatmap, sound, and step mode identical across all algorithms
+- Tournament, race mode, and quiz automatically include the four new algorithms
+- Service worker cache bumped to v6 and now precaches `sorting-core.js`
+
 ## [2026-08-20] — v5 Path Lab
 
 ### Added
