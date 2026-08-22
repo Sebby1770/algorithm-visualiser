@@ -1,11 +1,13 @@
 /* ============================================================
-   Sorting Algorithm Lab v4
+   Sorting Algorithm Lab v6
    Vanilla JS — no frameworks
+   Algorithm step logic lives in sorting-core.js (SortCore);
+   this file drives the visuals, metrics, and app chrome.
    ============================================================ */
 
 const ALGORITHM_IDS = [
   "bubble", "selection", "insertion", "merge", "quick", "heap", "shell", "radix",
-  "counting", "cocktail",
+  "counting", "cocktail", "comb", "gnome", "cycle", "tim",
 ];
 
 // ---------- Algorithm metadata ----------
@@ -110,6 +112,46 @@ const ALGORITHM_PROFILES = {
     memory: "O(1)",
     description: "Bidirectional bubble sort — sweeps forward then backward each pass.",
   },
+  comb: {
+    name: "Comb Sort",
+    best: "O(n log n)",
+    avg: "O(n²/2ᵖ)",
+    worst: "O(n²)",
+    stable: false,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Bubble sort with a shrinking gap (÷1.3) — kills turtles early.",
+  },
+  gnome: {
+    name: "Gnome Sort",
+    best: "O(n)",
+    avg: "O(n²)",
+    worst: "O(n²)",
+    stable: true,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Walks forward until a pair is out of order, swaps, and steps back.",
+  },
+  cycle: {
+    name: "Cycle Sort",
+    best: "O(n²)",
+    avg: "O(n²)",
+    worst: "O(n²)",
+    stable: false,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Rotates each cycle into place — provably minimal array writes (≤ n).",
+  },
+  tim: {
+    name: "TimSort (simplified)",
+    best: "O(n)",
+    avg: "O(n log n)",
+    worst: "O(n log n)",
+    stable: true,
+    inPlace: false,
+    memory: "O(n)",
+    description: "Insertion-sorts small runs, then merges them — skipping already-ordered pairs.",
+  },
 };
 
 const LEARNING_CARDS = {
@@ -152,6 +194,22 @@ const LEARNING_CARDS = {
   cocktail: {
     trivia: "Cocktail shaker sort is also called bidirectional bubble sort or shaker sort.",
     useCase: "Teaching bidirectional scanning — slightly better than bubble on reversed arrays.",
+  },
+  comb: {
+    trivia: "Comb sort's 1.3 shrink factor was found empirically — it eliminates small values stuck at the end ('turtles') that cripple bubble sort.",
+    useCase: "A drop-in bubble sort upgrade when you want simple code with far better average behavior.",
+  },
+  gnome: {
+    trivia: "Named after the garden gnome who sorts flower pots: step forward when they're in order, swap and step back when they're not.",
+    useCase: "Teaching the simplest possible stable sort — one loop, no nested indices.",
+  },
+  cycle: {
+    trivia: "Cycle sort is provably optimal in memory writes — every element is written at most once.",
+    useCase: "EEPROM and flash memory where each write costs wear — minimizing writes extends hardware life.",
+  },
+  tim: {
+    trivia: "TimSort, invented by Tim Peters in 2002 for Python, is the standard sort in Python and Java — it exploits runs that already exist in real data.",
+    useCase: "Real-world data that is partially sorted — appending new records to an already-sorted list.",
   },
 };
 
@@ -196,6 +254,11 @@ const dom = {
   nextStepBtn: $("nextStepBtn"),
   resetBtn: $("resetBtn"),
   tournamentBtn: $("tournamentBtn"),
+  profilerBtn: $("profilerBtn"),
+  profilerPanel: $("profilerPanel"),
+  profilerChart: $("profilerChart"),
+  profilerTable: $("profilerTable"),
+  profilerStatus: $("profilerStatus"),
   exportCsvBtn: $("exportCsvBtn"),
   copySummaryBtn: $("copySummaryBtn"),
   visualizer: $("visualizer"),
@@ -741,78 +804,8 @@ class SortRunner {
     }
   }
 
-  async compare(i, j) {
-    this.metrics.comparisons++;
-    this.trackAccess(i, j);
-    if (!this.silent) {
-      this.bars[i]?.classList.add("compare");
-      this.bars[j]?.classList.add("compare");
-    }
-    this.audio?.compare();
-    this.updateMetricsDisplay();
-    this.narrate(`Now comparing indices ${i} and ${j} (values ${this.array[i]} and ${this.array[j]}).`);
-    this.recordOperation();
-    this.notifyVisualUpdate();
-    await this.waitStep();
-  }
-
-  clearCompare(i, j) {
-    this.bars[i]?.classList.remove("compare");
-    this.bars[j]?.classList.remove("compare");
-  }
-
-  async swap(i, j) {
-    this.metrics.swaps++;
-    this.metrics.writes += 2;
-    this.trackAccess(i, j);
-    [this.array[i], this.array[j]] = [this.array[j], this.array[i]];
-    if (!this.silent) {
-      this.bars[i].style.height = `${this.array[i]}%`;
-      this.bars[j].style.height = `${this.array[j]}%`;
-      this.bars[i].classList.add("swap");
-      this.bars[j].classList.add("swap");
-    }
-    this.audio?.swap();
-    this.updateMetricsDisplay();
-    this.narrate(`Swapping indices ${i} and ${j}.`);
-    this.recordOperation();
-    this.notifyVisualUpdate();
-    await this.waitStep();
-    this.bars[i]?.classList.remove("swap");
-    this.bars[j]?.classList.remove("swap");
-  }
-
-  async write(i, value) {
-    this.metrics.writes++;
-    this.trackAccess(i);
-    this.array[i] = value;
-    if (!this.silent) {
-      this.bars[i].style.height = `${value}%`;
-      this.bars[i].classList.add("write");
-    }
-    this.audio?.write();
-    this.updateMetricsDisplay();
-    this.narrate(`Writing value ${value} to index ${i}.`);
-    this.recordOperation();
-    this.notifyVisualUpdate();
-    await this.waitStep();
-    this.bars[i]?.classList.remove("write");
-  }
-
   markSorted(i) {
     this.bars[i]?.classList.add("sorted");
-  }
-
-  async markPivot(i) {
-    this.trackAccess(i);
-    this.bars[i]?.classList.add("pivot");
-    this.narrate(`Pivot selected at index ${i} (value ${this.array[i]}).`);
-    this.notifyVisualUpdate();
-    await this.waitStep();
-  }
-
-  clearPivot(i) {
-    this.bars[i]?.classList.remove("pivot");
   }
 
   async run(algorithm) {
@@ -822,21 +815,11 @@ class SortRunner {
     this.metrics.start();
     this.clearStateClasses();
 
-    const runners = {
-      bubble: () => this.bubbleSort(),
-      selection: () => this.selectionSort(),
-      insertion: () => this.insertionSort(),
-      merge: () => this.mergeSort(),
-      quick: () => this.quickSort(),
-      heap: () => this.heapSort(),
-      shell: () => this.shellSort(),
-      radix: () => this.radixSort(),
-      counting: () => this.countingSort(),
-      cocktail: () => this.cocktailShakerSort(),
-    };
+    const generator = SortCore.algorithms[algorithm];
+    if (!generator) throw new Error(`Unknown algorithm: ${algorithm}`);
 
     try {
-      await runners[algorithm]();
+      await this.consume(generator(this.array));
       if (!this.silent) {
         this.bars.forEach((bar) => bar.classList.add("sorted"));
       }
@@ -850,376 +833,124 @@ class SortRunner {
     }
   }
 
-  async bubbleSort() {
-    const n = this.array.length;
-    for (let i = 0; i < n - 1; i++) {
-      for (let j = 0; j < n - i - 1; j++) {
-        await this.compare(j, j + 1);
-        if (this.array[j] > this.array[j + 1]) {
-          await this.swap(j, j + 1);
-        }
-        this.clearCompare(j, j + 1);
-      }
-      this.markSorted(n - i - 1);
-    }
-    this.markSorted(0);
-  }
-
-  async selectionSort() {
-    const n = this.array.length;
-    for (let i = 0; i < n - 1; i++) {
-      let minIdx = i;
-      if (!this.silent) this.bars[minIdx].classList.add("compare");
-
-      for (let j = i + 1; j < n; j++) {
-        await this.compare(j, minIdx);
-        if (this.array[j] < this.array[minIdx]) {
-          this.bars[minIdx]?.classList.remove("compare");
-          minIdx = j;
-          if (!this.silent) this.bars[minIdx].classList.add("compare");
-        } else {
-          this.bars[j]?.classList.remove("compare");
-        }
-      }
-
-      if (minIdx !== i) await this.swap(i, minIdx);
-      this.bars[minIdx]?.classList.remove("compare");
-      this.markSorted(i);
-    }
-    this.markSorted(n - 1);
-  }
-
-  async insertionSort() {
-    const n = this.array.length;
-    this.markSorted(0);
-
-    for (let i = 1; i < n; i++) {
-      let j = i;
-      if (!this.silent) this.bars[i].classList.add("compare");
-
-      while (j > 0) {
-        await this.compare(j - 1, j);
-        if (this.array[j - 1] > this.array[j]) {
-          await this.swap(j - 1, j);
-          j--;
-        } else {
-          this.clearCompare(j - 1, j);
+  /**
+   * Animate a SortCore operation stream. The generator mutates
+   * this.array itself; this driver only renders, counts, and paces.
+   */
+  async consume(ops) {
+    for (const op of ops) {
+      switch (op.t) {
+        case "compare": {
+          this.metrics.comparisons++;
+          this.trackAccess(op.i, op.j);
+          if (!this.silent) {
+            this.bars[op.i]?.classList.add("compare");
+            this.bars[op.j]?.classList.add("compare");
+          }
+          this.audio?.compare();
+          this.updateMetricsDisplay();
+          this.narrate(
+            `Now comparing indices ${op.i} and ${op.j} (values ${this.array[op.i]} and ${this.array[op.j]}).`
+          );
+          this.recordOperation();
+          this.notifyVisualUpdate();
+          await this.waitStep();
+          this.bars[op.i]?.classList.remove("compare");
+          this.bars[op.j]?.classList.remove("compare");
           break;
         }
-        this.clearCompare(j - 1, j);
-      }
 
-      this.bars[i]?.classList.remove("compare");
-      for (let k = 0; k <= i; k++) this.markSorted(k);
-    }
-  }
-
-  async mergeSort() {
-    const aux = [...this.array];
-    await this.mergeSortRange(0, this.array.length - 1, aux);
-  }
-
-  async mergeSortRange(low, high, aux) {
-    if (low >= high) return;
-    const mid = Math.floor((low + high) / 2);
-    this.narrate(`Merge sort: dividing range [${low}…${high}] at midpoint ${mid}.`);
-    await this.mergeSortRange(low, mid, aux);
-    await this.mergeSortRange(mid + 1, high, aux);
-    await this.merge(low, mid, high, aux);
-  }
-
-  async merge(low, mid, high, aux) {
-    this.narrate(`Merging sorted halves [${low}…${mid}] and [${mid + 1}…${high}].`);
-    for (let k = low; k <= high; k++) {
-      aux[k] = this.array[k];
-    }
-
-    let i = low;
-    let j = mid + 1;
-    let k = low;
-
-    while (i <= mid && j <= high) {
-      await this.compare(i, j);
-      if (aux[i] <= aux[j]) {
-        await this.write(k, aux[i]);
-        i++;
-      } else {
-        await this.write(k, aux[j]);
-        j++;
-      }
-      this.clearCompare(i, j);
-      k++;
-    }
-
-    while (i <= mid) {
-      await this.write(k, aux[i]);
-      i++;
-      k++;
-    }
-
-    while (j <= high) {
-      await this.write(k, aux[j]);
-      j++;
-      k++;
-    }
-  }
-
-  async quickSort(low = 0, high = this.array.length - 1) {
-    if (low < high) {
-      const pivotIdx = await this.partition(low, high);
-      await this.quickSort(low, pivotIdx - 1);
-      await this.quickSort(pivotIdx + 1, high);
-    }
-  }
-
-  async partition(low, high) {
-    await this.markPivot(high);
-    const pivotValue = this.array[high];
-    let i = low - 1;
-
-    for (let j = low; j < high; j++) {
-      await this.compare(j, high);
-      if (this.array[j] < pivotValue) {
-        i++;
-        if (i !== j) await this.swap(i, j);
-      }
-      this.clearCompare(j, high);
-    }
-
-    await this.swap(i + 1, high);
-    this.clearPivot(high);
-    this.markSorted(i + 1);
-    return i + 1;
-  }
-
-  async heapSort() {
-    const n = this.array.length;
-    for (let i = Math.floor(n / 2) - 1; i >= 0; i--) {
-      await this.heapify(n, i);
-    }
-
-    for (let i = n - 1; i > 0; i--) {
-      await this.swap(0, i);
-      this.markSorted(i);
-      await this.heapify(i, 0);
-    }
-    this.markSorted(0);
-  }
-
-  async heapify(size, root) {
-    let largest = root;
-    const left = 2 * root + 1;
-    const right = 2 * root + 2;
-
-    if (left < size) {
-      await this.compare(left, largest);
-      if (this.array[left] > this.array[largest]) largest = left;
-      this.clearCompare(left, root);
-    }
-
-    if (right < size) {
-      const compareWith = largest;
-      await this.compare(right, compareWith);
-      if (this.array[right] > this.array[compareWith]) largest = right;
-      this.clearCompare(right, compareWith);
-    }
-
-    if (largest !== root) {
-      await this.swap(root, largest);
-      await this.heapify(size, largest);
-    }
-  }
-
-  async shellSort() {
-    const n = this.array.length;
-    let gap = Math.floor(n / 2);
-
-    while (gap > 0) {
-      this.currentGap = gap;
-      this.narrate(`Shell sort: starting pass with gap = ${gap}.`);
-
-      for (let i = gap; i < n; i++) {
-        const temp = this.array[i];
-        let j = i;
-        if (!this.silent) this.bars[i]?.classList.add("gap");
-
-        while (j >= gap) {
-          await this.compare(j - gap, j);
-          if (!this.silent) this.bars[j - gap]?.classList.add("gap");
-          this.narrate(
-            `Comparing indices ${j - gap} and ${j} (${gap} apart): ${this.array[j - gap]} vs ${temp}.`
-          );
-
-          if (this.array[j - gap] > temp) {
-            await this.write(j, this.array[j - gap]);
-            j -= gap;
-          } else {
-            this.clearCompare(j - gap, j);
-            this.bars[j - gap]?.classList.remove("gap");
-            break;
+        case "swap": {
+          this.metrics.swaps++;
+          this.metrics.writes += 2;
+          this.trackAccess(op.i, op.j);
+          if (!this.silent) {
+            this.bars[op.i].style.height = `${this.array[op.i]}%`;
+            this.bars[op.j].style.height = `${this.array[op.j]}%`;
+            this.bars[op.i].classList.add("swap");
+            this.bars[op.j].classList.add("swap");
           }
-          this.clearCompare(j - gap, j);
-          this.bars[j - gap]?.classList.remove("gap");
+          this.audio?.swap();
+          this.updateMetricsDisplay();
+          this.narrate(`Swapping indices ${op.i} and ${op.j}.`);
+          this.recordOperation();
+          this.notifyVisualUpdate();
+          await this.waitStep();
+          this.bars[op.i]?.classList.remove("swap");
+          this.bars[op.j]?.classList.remove("swap");
+          break;
         }
 
-        if (j !== i) {
-          await this.write(j, temp);
+        case "write": {
+          this.metrics.writes++;
+          this.trackAccess(op.i);
+          if (!this.silent) {
+            this.bars[op.i].style.height = `${op.value}%`;
+            this.bars[op.i].classList.add("write");
+          }
+          this.audio?.write();
+          this.updateMetricsDisplay();
+          this.narrate(`Writing value ${op.value} to index ${op.i}.`);
+          this.recordOperation();
+          this.notifyVisualUpdate();
+          await this.waitStep();
+          this.bars[op.i]?.classList.remove("write");
+          break;
         }
-        this.bars[i]?.classList.remove("gap");
-      }
 
-      gap = Math.floor(gap / 2);
-    }
-  }
-
-  async radixSort() {
-    const max = Math.max(...this.array);
-    const placeNames = ["ones", "tens", "hundreds"];
-    let exp = 1;
-    let pass = 0;
-
-    while (Math.floor(max / exp) > 0) {
-      this.currentDigitExp = exp;
-      const place = placeNames[pass] || `10^${pass}`;
-      this.narrate(`Radix sort pass ${pass + 1}: sorting by ${place} digit.`);
-      await this.radixCountingSort(exp);
-      exp *= 10;
-      pass++;
-    }
-  }
-
-  async radixCountingSort(exp) {
-    const n = this.array.length;
-    const output = new Array(n);
-    const count = new Array(10).fill(0);
-
-    for (let i = 0; i < n; i++) {
-      const digit = Math.floor(this.array[i] / exp) % 10;
-      if (!this.silent) this.bars[i]?.classList.add("digit");
-      this.narrate(`Counting digit ${digit} at index ${i} (value ${this.array[i]}).`);
-      count[digit]++;
-      await this.waitStep();
-      this.bars[i]?.classList.remove("digit");
-    }
-
-    for (let i = 1; i < 10; i++) {
-      count[i] += count[i - 1];
-    }
-
-    for (let i = n - 1; i >= 0; i--) {
-      const digit = Math.floor(this.array[i] / exp) % 10;
-      const pos = count[digit] - 1;
-      output[pos] = this.array[i];
-      this.narrate(`Placing ${this.array[i]} into bucket position ${pos} (digit ${digit}).`);
-      count[digit]--;
-      if (!this.silent) {
-        this.bars[i]?.classList.add("digit");
-        await this.waitStep();
-        this.bars[i]?.classList.remove("digit");
-      }
-    }
-
-    for (let i = 0; i < n; i++) {
-      await this.write(i, output[i]);
-      if (!this.silent) {
-        this.bars[i]?.classList.add("digit");
-        await this.waitStep();
-        this.bars[i]?.classList.remove("digit");
-      }
-    }
-  }
-
-  async countingSort() {
-    const n = this.array.length;
-    const min = Math.min(...this.array);
-    const max = Math.max(...this.array);
-    const range = max - min + 1;
-    const count = new Array(range).fill(0);
-
-    this.narrate(`Counting sort: value range ${min}…${max} (${range} buckets).`);
-
-    for (let i = 0; i < n; i++) {
-      const bucket = this.array[i] - min;
-      this.trackAccess(i);
-      if (!this.silent) this.bars[i]?.classList.add("bucket");
-      count[bucket]++;
-      this.metrics.writes++;
-      this.onCountingArrayUpdate?.(count, min, max, bucket);
-      this.narrate(`Incrementing count for value ${this.array[i]} (bucket ${bucket}).`);
-      this.recordOperation();
-      this.notifyVisualUpdate();
-      await this.waitStep();
-      this.bars[i]?.classList.remove("bucket");
-    }
-
-    for (let i = 1; i < range; i++) {
-      count[i] += count[i - 1];
-      this.onCountingArrayUpdate?.(count, min, max, i);
-      this.narrate(`Prefix sum at bucket ${i}: cumulative count = ${count[i]}.`);
-      this.recordOperation();
-      await this.waitStep();
-    }
-
-    const output = new Array(n);
-    for (let i = n - 1; i >= 0; i--) {
-      const bucket = this.array[i] - min;
-      this.trackAccess(i);
-      const pos = count[bucket] - 1;
-      output[pos] = this.array[i];
-      count[bucket]--;
-      if (!this.silent) this.bars[i]?.classList.add("bucket");
-      this.onCountingArrayUpdate?.(count, min, max, bucket);
-      this.narrate(`Placing ${this.array[i]} at output position ${pos}.`);
-      this.recordOperation();
-      this.notifyVisualUpdate();
-      await this.waitStep();
-      this.bars[i]?.classList.remove("bucket");
-    }
-
-    for (let i = 0; i < n; i++) {
-      await this.write(i, output[i]);
-      if (!this.silent) {
-        this.bars[i]?.classList.add("bucket");
-        await this.waitStep();
-        this.bars[i]?.classList.remove("bucket");
-      }
-    }
-  }
-
-  async cocktailShakerSort() {
-    const n = this.array.length;
-    let start = 0;
-    let end = n - 1;
-
-    while (start < end) {
-      this.narrate(`Cocktail pass: scanning forward from ${start} to ${end}.`);
-
-      for (let i = start; i < end; i++) {
-        await this.compare(i, i + 1);
-        if (this.array[i] > this.array[i + 1]) {
-          await this.swap(i, i + 1);
+        case "touch": {
+          this.trackAccess(op.i);
+          if (!this.silent) this.bars[op.i]?.classList.add(op.cls);
+          this.notifyVisualUpdate();
+          await this.waitStep();
+          this.bars[op.i]?.classList.remove(op.cls);
+          break;
         }
-        this.clearCompare(i, i + 1);
-      }
-      this.markSorted(end);
-      end--;
 
-      if (start >= end) break;
-
-      this.narrate(`Cocktail pass: scanning backward from ${end} to ${start}.`);
-
-      for (let i = end; i > start; i--) {
-        await this.compare(i - 1, i);
-        if (this.array[i - 1] > this.array[i]) {
-          await this.swap(i - 1, i);
+        case "counts": {
+          this.metrics.writes += op.costWrites || 0;
+          if (op.access && op.access.length) this.trackAccess(...op.access);
+          if (!this.silent && op.idx >= 0 && op.cls) {
+            this.bars[op.idx]?.classList.add(op.cls);
+          }
+          this.onCountingArrayUpdate?.(op.counts, op.min, op.max, op.highlight);
+          this.updateMetricsDisplay();
+          this.recordOperation();
+          this.notifyVisualUpdate();
+          await this.waitStep();
+          if (op.idx >= 0 && op.cls) this.bars[op.idx]?.classList.remove(op.cls);
+          break;
         }
-        this.clearCompare(i - 1, i);
-      }
-      this.markSorted(start);
-      start++;
-    }
 
-    if (n > 0) this.markSorted(start);
+        case "sorted":
+          this.markSorted(op.i);
+          break;
+
+        case "mark":
+          this.trackAccess(op.i);
+          if (!this.silent) this.bars[op.i]?.classList.add(op.cls);
+          break;
+
+        case "unmark":
+          this.bars[op.i]?.classList.remove(op.cls);
+          break;
+
+        case "narrate":
+          this.narrate(op.text);
+          break;
+
+        case "gap":
+          this.currentGap = op.gap;
+          break;
+
+        case "digitExp":
+          this.currentDigitExp = op.exp;
+          break;
+
+        default:
+          break;
+      }
+    }
   }
 }
 
@@ -1357,6 +1088,7 @@ class SortLabApp {
     dom.stopBtn.addEventListener("click", () => this.stopSort());
     dom.nextStepBtn.addEventListener("click", () => this.nextStep());
     dom.tournamentBtn.addEventListener("click", () => this.runTournament());
+    dom.profilerBtn.addEventListener("click", () => this.runProfiler());
     dom.exportCsvBtn.addEventListener("click", () => this.exportCsv());
     dom.copySummaryBtn.addEventListener("click", () => this.copySummary());
     dom.themeToggle.addEventListener("click", () => this.toggleTheme());
@@ -1757,7 +1489,7 @@ class SortLabApp {
     const ids = [
       "algorithm", "algorithmRace", "dataset", "size", "speed",
       "raceMode", "stepMode", "teachingMode", "quizMode", "generateBtn", "startBtn",
-      "resetBtn", "tournamentBtn", "applyCustomBtn", "shareUrlBtn", "presentationBtn",
+      "resetBtn", "tournamentBtn", "profilerBtn", "applyCustomBtn", "shareUrlBtn", "presentationBtn",
     ];
     ids.forEach((id) => {
       const el = dom[id];
@@ -1899,7 +1631,7 @@ class SortLabApp {
     const size = data.length;
     const results = [];
 
-    this.setStatus("Running benchmark tournament on all 10 algorithms…");
+    this.setStatus(`Running benchmark tournament on all ${ALGORITHM_IDS.length} algorithms…`);
     this.announce("Benchmark tournament started.");
 
     for (const algo of ALGORITHM_IDS) {
@@ -1945,6 +1677,152 @@ class SortLabApp {
     this.isRunning = false;
     this.setControlsDisabled(false);
     this.updateCustomFieldVisibility();
+  }
+
+  // ---------- Complexity profiler ----------
+
+  static PROFILER_SIZES = [16, 32, 64, 128, 256, 512];
+
+  profilerColor(index) {
+    return `hsl(${Math.round((index * 360) / ALGORITHM_IDS.length)}, 70%, 52%)`;
+  }
+
+  async runProfiler() {
+    if (this.isRunning) return;
+    const sizes = SortLabApp.PROFILER_SIZES;
+    const datasetType = dom.dataset.value === "custom" ? "random" : dom.dataset.value;
+
+    dom.profilerPanel.hidden = false;
+    this.setStatus("Profiling all algorithms across input sizes…");
+    this.announce("Complexity profiling started.");
+
+    const results = [];
+    for (const id of ALGORITHM_IDS) {
+      dom.profilerStatus.textContent = `Measuring ${ALGORITHM_PROFILES[id].name}…`;
+      await new Promise((r) => setTimeout(r, 0));
+      const points = SortCore.benchmark(id, sizes, (n) => generateDataset(datasetType, n));
+      results.push({
+        id,
+        name: ALGORITHM_PROFILES[id].name,
+        theoretical: ALGORITHM_PROFILES[id].avg,
+        points,
+        exponent: SortCore.estimateExponent(points),
+      });
+    }
+
+    this.profilerResults = results;
+    this.renderProfilerChart(results, sizes);
+    this.renderProfilerTable(results, sizes);
+    dom.profilerStatus.textContent =
+      `Dataset: ${DATASET_LABELS[datasetType] || datasetType} — total operations (comparisons + swaps + writes) ` +
+      `measured at n = ${sizes.join(", ")}. On the log-log chart, the slope of each line ≈ the exponent k in O(nᵏ).`;
+    this.setStatus("Complexity profile complete");
+    this.showToast("Complexity profile complete");
+    this.announce("Complexity profiling complete.");
+  }
+
+  renderProfilerChart(results, sizes) {
+    const canvas = dom.profilerChart;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const W = canvas.width;
+    const H = canvas.height;
+    const PAD = { left: 46, right: 12, top: 12, bottom: 26 };
+
+    ctx.clearRect(0, 0, W, H);
+
+    const xMin = Math.log(sizes[0]);
+    const xMax = Math.log(sizes[sizes.length - 1]);
+    let yMax = 1;
+    let yMin = Infinity;
+    results.forEach((r) =>
+      r.points.forEach((p) => {
+        if (p.ops > 0) {
+          yMax = Math.max(yMax, p.ops);
+          yMin = Math.min(yMin, p.ops);
+        }
+      })
+    );
+    const lyMin = Math.log(Math.max(1, yMin));
+    const lyMax = Math.log(yMax);
+    const toX = (n) => PAD.left + ((Math.log(n) - xMin) / (xMax - xMin)) * (W - PAD.left - PAD.right);
+    const toY = (ops) =>
+      H - PAD.bottom - ((Math.log(Math.max(1, ops)) - lyMin) / (lyMax - lyMin || 1)) * (H - PAD.top - PAD.bottom);
+
+    // axes + gridlines
+    ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.lineWidth = 1;
+
+    sizes.forEach((n) => {
+      const x = toX(n);
+      ctx.beginPath();
+      ctx.moveTo(x, PAD.top);
+      ctx.lineTo(x, H - PAD.bottom);
+      ctx.stroke();
+      ctx.textAlign = "center";
+      ctx.fillText(String(n), x, H - PAD.bottom + 14);
+    });
+
+    for (let e = Math.ceil(lyMin / Math.LN10); e <= Math.floor(lyMax / Math.LN10); e++) {
+      const ops = Math.pow(10, e);
+      const y = toY(ops);
+      ctx.beginPath();
+      ctx.moveTo(PAD.left, y);
+      ctx.lineTo(W - PAD.right, y);
+      ctx.stroke();
+      ctx.textAlign = "right";
+      ctx.fillText(`10^${e}`, PAD.left - 4, y + 3);
+    }
+
+    // one line per algorithm
+    results.forEach((r, idx) => {
+      ctx.strokeStyle = this.profilerColor(idx);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      r.points.forEach((p, i) => {
+        const x = toX(p.n);
+        const y = toY(p.ops);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    });
+  }
+
+  renderProfilerTable(results, sizes) {
+    const maxN = sizes[sizes.length - 1];
+    const rows = [...results]
+      .sort((a, b) => (a.exponent ?? 99) - (b.exponent ?? 99))
+      .map((r, i) => {
+        const idx = ALGORITHM_IDS.indexOf(r.id);
+        const measured = r.exponent == null ? "—" : `n^${r.exponent.toFixed(2)}`;
+        const opsAtMax = r.points[r.points.length - 1].ops.toLocaleString();
+        return `
+          <tr>
+            <td>${i + 1}</td>
+            <td><span class="profiler-dot" style="background:${this.profilerColor(idx)}"></span>${r.name}</td>
+            <td><strong>${measured}</strong></td>
+            <td>${r.theoretical}</td>
+            <td>${opsAtMax}</td>
+          </tr>`;
+      })
+      .join("");
+
+    dom.profilerTable.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Algorithm</th>
+            <th>Measured growth</th>
+            <th>Theoretical avg</th>
+            <th>Ops @ n=${maxN}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
   }
 
   renderLeaderboard(results) {

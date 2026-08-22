@@ -54,6 +54,10 @@
               <option value="radix">Radix Sort</option>
               <option value="counting">Counting Sort</option>
               <option value="cocktail">Cocktail Shaker Sort</option>
+              <option value="comb">Comb Sort</option>
+              <option value="gnome">Gnome Sort</option>
+              <option value="cycle">Cycle Sort</option>
+              <option value="tim">TimSort (simplified)</option>
             </select>
           </div>
 
@@ -73,6 +77,10 @@
               <option value="radix">Radix Sort</option>
               <option value="counting">Counting Sort</option>
               <option value="cocktail">Cocktail Shaker Sort</option>
+              <option value="comb">Comb Sort</option>
+              <option value="gnome">Gnome Sort</option>
+              <option value="cycle">Cycle Sort</option>
+              <option value="tim">TimSort (simplified)</option>
             </select>
           </div>
 
@@ -137,7 +145,8 @@
             <button id="resetBtn" class="btn btn-secondary" title="Shortcut: R">Reset</button>
           </div>
 
-          <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 10 algorithms on current data">🏆 Benchmark Tournament</button>
+          <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 14 algorithms on current data">🏆 Benchmark Tournament</button>
+          <button id="profilerBtn" type="button" class="btn btn-accent btn-full" title="Measure operation growth across input sizes">📈 Complexity Profiler</button>
 
           <p class="shortcut-hint">Space pause · S start · G generate · R reset · Esc exit present</p>
         </section>
@@ -176,6 +185,14 @@
         <section class="panel" id="tournamentPanel" hidden>
           <h2 class="panel-title">Tournament Leaderboard</h2>
           <div id="leaderboard" class="leaderboard-wrap"></div>
+        </section>
+
+        <section class="panel" id="profilerPanel" hidden>
+          <h2 class="panel-title">Complexity Profiler</h2>
+          <p class="panel-sub">Empirical operation growth — log-log, slope &asymp; exponent</p>
+          <canvas id="profilerChart" class="profiler-chart" width="640" height="320" aria-label="Log-log chart of operations versus input size for every algorithm"></canvas>
+          <p id="profilerStatus" class="profiler-status" aria-live="polite"></p>
+          <div id="profilerTable" class="matrix-wrap"></div>
         </section>
 
         <section class="panel" id="comparisonPanel" hidden>
@@ -264,6 +281,7 @@
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="a11yAnnouncer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
 
+  <script src="sorting-core.js"></script>
   <script src="script.js"></script>
 </body>
 </html>

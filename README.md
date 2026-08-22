@@ -4,10 +4,10 @@ An interactive teaching lab built with pure HTML, CSS, and vanilla JavaScript �
 
 Two labs share the same chrome, theme, and sound toggle:
 
-- **Sort Lab** (`index.html`) — 10 sorting algorithms
+- **Sort Lab** (`index.html`) — 14 sorting algorithms + empirical complexity profiler
 - **Path Lab** (`pathfinding.html`) — 6 pathfinding algorithms + maze generators
 
-![Algorithms](https://img.shields.io/badge/sort-10-blue) ![Pathfinding](https://img.shields.io/badge/path-6-indigo) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
+![Algorithms](https://img.shields.io/badge/sort-14-blue) ![Pathfinding](https://img.shields.io/badge/path-6-indigo) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
 
 ## Running
 
@@ -28,12 +28,16 @@ macOS: `open index.html` · Linux: `xdg-open index.html`
 Pathfinding algorithms and maze generators are covered by Node’s built-in test runner (no packages to install):
 
 ```bash
-node --test tests/pathfinding.test.js
+node --test tests/sorting.test.js tests/pathfinding.test.js
 ```
+
+Sorting coverage includes correctness on every dataset shape, stability proofs for the
+stable algorithms (via tagged keys), cycle sort's ≤ n write bound, and sanity checks on
+the complexity profiler's exponent estimator.
 
 ## Sort Lab
 
-### Algorithms (10)
+### Algorithms (14)
 
 | Algorithm | Best | Average | Worst | Stable | In-place | Memory |
 |-----------|------|---------|-------|--------|----------|--------|
@@ -47,6 +51,13 @@ node --test tests/pathfinding.test.js
 | Radix | O(nk) | O(nk) | O(nk) | Yes | No | O(n + k) |
 | Counting | O(n + k) | O(n + k) | O(n + k) | Yes | No | O(k) |
 | Cocktail Shaker | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
+| Comb | O(n log n) | O(n²/2ᵖ) | O(n²) | No | Yes | O(1) |
+| Gnome | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
+| Cycle | O(n²) | O(n²) | O(n²) | No | Yes | O(1) |
+| TimSort (simplified) | O(n) | O(n log n) | O(n log n) | Yes | No | O(n) |
+
+All fourteen are implemented once, as pure step generators in `sorting-core.js` —
+the page animates the operation stream, tests and the profiler consume it headlessly.
 
 ### Dataset generators
 
@@ -62,7 +73,10 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 - Presentation Mode
 - Access heatmap + operations sparkline
 - Algorithm recommender
-- Benchmark tournament (all 10) with comparison matrix
+- Benchmark tournament (all 14) with comparison matrix
+- **Complexity Profiler** — measures total operations at n = 16…512, plots every
+  algorithm on a log-log chart, and fits the empirical growth exponent (the slope)
+  so you can watch bubble sort measure ≈ n² while counting sort measures ≈ n¹
 - Learning cards (trivia + use cases)
 - Run history (last 8, `localStorage` key `sortLabHistory`)
 - Share URL, CSV export, copy summary
@@ -124,9 +138,11 @@ algorithm-visualiser/
 ├── index.html              # Sort Lab
 ├── pathfinding.html        # Path Lab
 ├── style.css               # Shared theme + path grid
-├── script.js               # Sort Lab app
+├── script.js               # Sort Lab app (rendering, metrics, chrome)
+├── sorting-core.js         # Sorting step generators + profiler (browser + Node)
 ├── pathfinding.js          # Path Lab UI
 ├── pathfinding-core.js     # Search + mazes (browser + Node)
+├── tests/sorting.test.js
 ├── tests/pathfinding.test.js
 ├── sw.js                   # Service worker
 ├── manifest.json           # PWA manifest
@@ -135,7 +151,7 @@ algorithm-visualiser/
 └── README.md
 ```
 
-`pathfinding-core.js` exports `PathCore` in the browser and `module.exports` in Node.
+`sorting-core.js` and `pathfinding-core.js` export `SortCore` / `PathCore` in the browser and `module.exports` in Node.
 
 ## License
 
