@@ -119,7 +119,9 @@
   function heuristic(a, b, opts) {
     const dr = Math.abs(a.r - b.r);
     const dc = Math.abs(a.c - b.c);
-    if (opts && opts.diagonal) return Math.sqrt(dr * dr + dc * dc);
+    // Diagonal steps cost 1 (same as orthogonal), so Chebyshev is admissible.
+    // Euclidean overestimates a 1-cost diagonal (~1.41) and A* can miss optimal paths.
+    if (opts && opts.diagonal) return Math.max(dr, dc);
     return dr + dc;
   }
 

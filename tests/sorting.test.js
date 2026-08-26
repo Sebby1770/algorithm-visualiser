@@ -87,3 +87,16 @@ test("counting and radix sort non-negative integers from the UI range", () => {
     assertSortedCopy(id, input);
   }
 });
+
+test("bubble and cocktail early-exit on a sorted array", () => {
+  const sorted = [1, 2, 3, 4, 5, 6, 7, 8];
+  const bubble = SortCore.sort("bubble", sorted);
+  const cocktail = SortCore.sort("cocktail", sorted);
+  assert.equal(SortCore.isSorted(bubble.array), true);
+  assert.equal(SortCore.isSorted(cocktail.array), true);
+  // One forward pass of n-1 compares, then stop — not n(n-1)/2.
+  assert.equal(bubble.comparisons, sorted.length - 1);
+  assert.ok(cocktail.comparisons <= sorted.length - 1);
+  assert.equal(bubble.swaps, 0);
+  assert.equal(cocktail.swaps, 0);
+});

@@ -264,11 +264,24 @@ test("makeGrid / cloneGrid / setCell helpers", () => {
   assert.equal(grid[0][0].type, "empty");
 });
 
-test("heuristic is manhattan, or euclidean when diagonal", () => {
+test("heuristic is manhattan, or chebyshev when diagonal", () => {
   const a = { r: 0, c: 0 };
   const b = { r: 3, c: 4 };
   assert.equal(PathCore.heuristic(a, b), 7);
-  assert.equal(PathCore.heuristic(a, b, { diagonal: true }), 5);
+  // Diagonal steps cost 1, so Chebyshev max(3,4)=4 is admissible (Euclidean 5 is not).
+  assert.equal(PathCore.heuristic(a, b, { diagonal: true }), 4);
+});
+
+test("A* path cost matches Dijkstra with diagonal movement", () => {
+  const grid = PathCore.makeGrid(8, 10);
+  const start = { r: 0, c: 0 };
+  const end = { r: 7, c: 9 };
+  const opts = { diagonal: true, start, end };
+  const dijkstra = PathCore.dijkstra(grid, start, end, opts);
+  const astar = PathCore.astar(grid, start, end, opts);
+  assert.equal(dijkstra.found, true);
+  assert.equal(astar.found, true);
+  assert.equal(astar.pathCost, dijkstra.pathCost);
 });
 
 test("neighbors skip walls and stay in bounds", () => {

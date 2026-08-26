@@ -56,10 +56,15 @@
     const s = stats();
     const n = array.length;
     for (let i = 0; i < n - 1; i++) {
+      let swapped = false;
       for (let j = 0; j < n - i - 1; j++) {
         s.comparisons++;
-        if (array[j] > array[j + 1]) swapAt(array, j, j + 1, s);
+        if (array[j] > array[j + 1]) {
+          swapAt(array, j, j + 1, s);
+          swapped = true;
+        }
       }
+      if (!swapped) break;
     }
     return finish(array, s);
   }
@@ -304,17 +309,26 @@
     let start = 0;
     let end = n - 1;
     while (start < end) {
+      let swapped = false;
       for (let i = start; i < end; i++) {
         s.comparisons++;
-        if (array[i] > array[i + 1]) swapAt(array, i, i + 1, s);
+        if (array[i] > array[i + 1]) {
+          swapAt(array, i, i + 1, s);
+          swapped = true;
+        }
       }
       end--;
-      if (start >= end) break;
+      if (!swapped || start >= end) break;
+      swapped = false;
       for (let i = end; i > start; i--) {
         s.comparisons++;
-        if (array[i - 1] > array[i]) swapAt(array, i - 1, i, s);
+        if (array[i - 1] > array[i]) {
+          swapAt(array, i - 1, i, s);
+          swapped = true;
+        }
       }
       start++;
+      if (!swapped) break;
     }
     return finish(array, s);
   }

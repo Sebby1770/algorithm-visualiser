@@ -48,7 +48,7 @@ const ALGORITHM_PROFILES = {
     weighted: true,
     complete: true,
     optimal: "Yes (admissible h)",
-    heuristic: "Manhattan / Euclidean",
+    heuristic: "Manhattan / Chebyshev if diagonal",
     description: "Dijkstra plus a heuristic that estimates remaining cost. Usually expands fewer nodes than Dijkstra.",
   },
   greedy: {
@@ -58,7 +58,7 @@ const ALGORITHM_PROFILES = {
     weighted: false,
     complete: true,
     optimal: "No",
-    heuristic: "Manhattan / Euclidean",
+    heuristic: "Manhattan / Chebyshev if diagonal",
     description: "Always expands the cell that looks closest to the goal. Fast, but walls can send it the long way.",
   },
   bidirectionalBfs: {
@@ -78,7 +78,7 @@ const ALGORITHM_PROFILES = {
     weighted: true,
     complete: true,
     optimal: "No (w=1.5)",
-    heuristic: "Manhattan / Euclidean × 1.5",
+    heuristic: "Manhattan / Chebyshev × 1.5",
     description: "A* with a scaled heuristic (weight 1.5). Faster and greedier; paths may be slightly longer.",
   },
   idaStar: {
@@ -88,7 +88,7 @@ const ALGORITHM_PROFILES = {
     weighted: true,
     complete: true,
     optimal: "Yes (admissible h)",
-    heuristic: "Manhattan / Euclidean",
+    heuristic: "Manhattan / Chebyshev if diagonal",
     description: "Iterative deepening A*: DFS with a rising f-cost bound. Tiny memory, more re-expansions.",
   },
 };

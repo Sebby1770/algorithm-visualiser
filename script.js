@@ -913,14 +913,20 @@ class SortRunner {
   async bubbleSort() {
     const n = this.array.length;
     for (let i = 0; i < n - 1; i++) {
+      let swapped = false;
       for (let j = 0; j < n - i - 1; j++) {
         await this.compare(j, j + 1);
         if (this.array[j] > this.array[j + 1]) {
           await this.swap(j, j + 1);
+          swapped = true;
         }
         this.clearCompare(j, j + 1);
       }
       this.markSorted(n - i - 1);
+      if (!swapped) {
+        for (let k = 0; k < n - i - 1; k++) this.markSorted(k);
+        break;
+      }
     }
     this.markSorted(0);
   }
@@ -1252,31 +1258,36 @@ class SortRunner {
     let end = n - 1;
 
     while (start < end) {
+      let swapped = false;
       this.narrate(`Cocktail pass: scanning forward from ${start} to ${end}.`);
 
       for (let i = start; i < end; i++) {
         await this.compare(i, i + 1);
         if (this.array[i] > this.array[i + 1]) {
           await this.swap(i, i + 1);
+          swapped = true;
         }
         this.clearCompare(i, i + 1);
       }
       this.markSorted(end);
       end--;
 
-      if (start >= end) break;
+      if (!swapped || start >= end) break;
 
+      swapped = false;
       this.narrate(`Cocktail pass: scanning backward from ${end} to ${start}.`);
 
       for (let i = end; i > start; i--) {
         await this.compare(i - 1, i);
         if (this.array[i - 1] > this.array[i]) {
           await this.swap(i - 1, i);
+          swapped = true;
         }
         this.clearCompare(i - 1, i);
       }
       this.markSorted(start);
       start++;
+      if (!swapped) break;
     }
 
     if (n > 0) this.markSorted(start);

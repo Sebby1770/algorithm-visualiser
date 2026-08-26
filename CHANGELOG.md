@@ -2,6 +2,12 @@
 
 All notable changes to Algo Lab (Algorithm Visualizer).
 
+## [2026-08-26] — v6.1 teaching correctness
+
+### Fixed
+- **A* diagonal heuristic** is Chebyshev (`max(dr,dc)`), not Euclidean. Diagonal steps cost 1, so Euclidean overestimated and A* was not optimal. Profiles/README match.
+- **Bubble and Cocktail** now stop on a clean pass, so the advertised O(n) best case is real.
+
 ## [2026-08-26] — v6 Search Lab
 
 ### Added

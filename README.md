@@ -91,11 +91,11 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 | BFS | O(V + E) | No | Yes | Unweighted shortest | None |
 | DFS | O(V + E) | No | Yes | No | None |
 | Dijkstra | O((V + E) log V) | Yes | Yes | Yes (non-negative) | None |
-| A* | O((V + E) log V) | Yes | Yes | Yes (admissible h) | Manhattan / Euclidean if diagonal |
-| Greedy Best-First | O((V + E) log V) | No | Yes | No | Manhattan / Euclidean if diagonal |
+| A* | O((V + E) log V) | Yes | Yes | Yes (admissible h) | Manhattan / Chebyshev if diagonal |
+| Greedy Best-First | O((V + E) log V) | No | Yes | No | Manhattan / Chebyshev if diagonal |
 | Bidirectional BFS | O(V + E) | No | Yes | Unweighted shortest | None |
-| Weighted A* | O((V + E) log V) | Yes | Yes | No (w=1.5) | Manhattan / Euclidean × 1.5 |
-| IDA* | O(b^d) | Yes | Yes | Yes (admissible h) | Manhattan / Euclidean |
+| Weighted A* | O((V + E) log V) | Yes | Yes | No (w=1.5) | Manhattan / Chebyshev × 1.5 |
+| IDA* | O(b^d) | Yes | Yes | Yes (admissible h) | Manhattan / Chebyshev |
 
 Path cost is the sum of cell weights along the path **excluding start, including end**. Empty cells weigh `1`; weight cells weigh `5`. BFS / DFS / bidirectional BFS treat every step as cost 1 when *searching*, but reported path cost still uses actual weights.
 
