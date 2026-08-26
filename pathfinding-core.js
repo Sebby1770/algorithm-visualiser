@@ -963,6 +963,157 @@
     return null;
   }
 
+  const MAP_TYPE_CHARS = { ".": true, "#": true, "5": true };
+  const MAX_MAP_DIM = 80;
+
+  function mapToken(type) {
+    if (type === "wall") return "#";
+    if (type === "weight") return "5";
+    return ".";
+  }
+
+  function rleEncodeTokens(tokens) {
+    let out = "";
+    let i = 0;
+    while (i < tokens.length) {
+      const ch = tokens[i];
+      let n = 1;
+      while (i + n < tokens.length && tokens[i + n] === ch) n++;
+      if (n > 1) out += String(n);
+      out += ch;
+      i += n;
+    }
+    return out;
+  }
+
+  /**
+   * Expand RLE of `.` empty, `#` wall, `5` weight. Optional decimal counts.
+   * `5` is both a digit and a type, so parses with expected length + backtracking.
+   */
+  function expandMapRle(rle, expected) {
+    if (typeof rle !== "string" || expected < 0) return null;
+    const n = rle.length;
+    const out = [];
+    const fail = new Set();
+
+    function tryRun(count, type, nextI, rec) {
+      if (count < 1 || out.length + count > expected) return false;
+      if (nextI > n) return false;
+      for (let k = 0; k < count; k++) out.push(type);
+      if (rec(nextI)) return true;
+      out.length -= count;
+      return false;
+    }
+
+    function rec(i) {
+      if (out.length === expected) return i === n;
+      if (i >= n) return false;
+      const key = i + "," + out.length;
+      if (fail.has(key)) return false;
+
+      const ch = rle[i];
+      // `5` is both a count digit and a weight token — try a single type first
+      // so `5.#55.` (5 empty, wall, 1 weight, 5 empty) does not become 5 weights.
+      if (MAP_TYPE_CHARS[ch]) {
+        if (tryRun(1, ch, i + 1, rec)) return true;
+      }
+
+      if (ch >= "0" && ch <= "9") {
+        let val = 0;
+        for (let j = i; j < n; j++) {
+          const d = rle[j];
+          if (d < "0" || d > "9") break;
+          val = val * 10 + (d.charCodeAt(0) - 48);
+          if (val > expected - out.length) break;
+          const t = rle[j + 1];
+          if (t && MAP_TYPE_CHARS[t] && val >= 1) {
+            if (tryRun(val, t, j + 2, rec)) return true;
+          }
+        }
+      }
+
+      fail.add(key);
+      return false;
+    }
+
+    if (!rec(0)) return null;
+    return out;
+  }
+
+  /**
+   * Compact share string: `rows x cols;sr,sc;er,ec;rle`
+   * RLE alphabet: `.` empty, `#` wall, `5` weight. Does not mutate grid.
+   */
+  function encodeMap(grid, start, end) {
+    if (!grid || !grid.length || !grid[0] || !grid[0].length) {
+      throw new Error("invalid grid");
+    }
+    if (!start || !end || typeof start.r !== "number" || typeof end.r !== "number") {
+      throw new Error("invalid terminals");
+    }
+    const rows = grid.length;
+    const cols = grid[0].length;
+    let tokens = "";
+    for (let r = 0; r < rows; r++) {
+      const row = grid[r];
+      if (!row || row.length !== cols) throw new Error("ragged grid");
+      for (let c = 0; c < cols; c++) {
+        tokens += mapToken(row[c] && row[c].type);
+      }
+    }
+    return (
+      rows +
+      "x" +
+      cols +
+      ";" +
+      start.r +
+      "," +
+      start.c +
+      ";" +
+      end.r +
+      "," +
+      end.c +
+      ";" +
+      rleEncodeTokens(tokens)
+    );
+  }
+
+  /**
+   * Inverse of encodeMap. Invalid input returns null.
+   */
+  function decodeMap(str) {
+    if (typeof str !== "string") return null;
+    const match = /^(\d+)x(\d+);(\d+),(\d+);(\d+),(\d+);(.*)$/.exec(str.trim());
+    if (!match) return null;
+    const rows = Number(match[1]);
+    const cols = Number(match[2]);
+    const sr = Number(match[3]);
+    const sc = Number(match[4]);
+    const er = Number(match[5]);
+    const ec = Number(match[6]);
+    const rle = match[7];
+    if (!Number.isInteger(rows) || !Number.isInteger(cols)) return null;
+    if (rows < 1 || cols < 1 || rows > MAX_MAP_DIM || cols > MAX_MAP_DIM) return null;
+    if (sr < 0 || sc < 0 || sr >= rows || sc >= cols) return null;
+    if (er < 0 || ec < 0 || er >= rows || ec >= cols) return null;
+    const tokens = expandMapRle(rle, rows * cols);
+    if (!tokens) return null;
+
+    const grid = makeGrid(rows, cols);
+    let k = 0;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const t = tokens[k++];
+        if (t === "#") setCell(grid, r, c, { type: "wall", weight: EMPTY_WEIGHT });
+        else if (t === "5") setCell(grid, r, c, { type: "weight" });
+        else setCell(grid, r, c, { type: "empty", weight: EMPTY_WEIGHT });
+      }
+    }
+    setCell(grid, sr, sc, { type: "start", weight: EMPTY_WEIGHT });
+    setCell(grid, er, ec, { type: "end", weight: EMPTY_WEIGHT });
+    return { grid, start: { r: sr, c: sc }, end: { r: er, c: ec } };
+  }
+
   const api = {
     EMPTY_WEIGHT,
     WEIGHT_CELL,
@@ -974,6 +1125,8 @@
     reconstructPath,
     cellWeight,
     findCell,
+    encodeMap,
+    decodeMap,
     bfs,
     dfs,
     dijkstra,

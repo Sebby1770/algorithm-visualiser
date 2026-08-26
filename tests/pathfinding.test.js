@@ -437,3 +437,48 @@ test("reconstructPath follows a parent map", () => {
     { r: 0, c: 2 },
   ]);
 });
+
+test("encodeMap / decodeMap round-trip a wall and a weight", () => {
+  const grid = PathCore.makeGrid(3, 4);
+  PathCore.setCell(grid, 0, 0, { type: "start", weight: 1 });
+  PathCore.setCell(grid, 2, 3, { type: "end", weight: 1 });
+  PathCore.setCell(grid, 1, 1, { type: "wall" });
+  PathCore.setCell(grid, 1, 2, { type: "weight" });
+  const start = { r: 0, c: 0 };
+  const end = { r: 2, c: 3 };
+  const before = snapshot(grid);
+
+  const encoded = PathCore.encodeMap(grid, start, end);
+  assert.equal(snapshot(grid), before, "encodeMap must not mutate the grid");
+  assert.equal(typeof encoded, "string");
+  assert.match(encoded, /^3x4;0,0;2,3;/);
+  assert.ok(encoded.includes("#"), "RLE should record the wall");
+  assert.ok(encoded.includes("5"), "RLE should record the weight");
+
+  const decoded = PathCore.decodeMap(encoded);
+  assert.ok(decoded, "decodeMap should accept a valid encoding");
+  assert.equal(decoded.grid.length, 3);
+  assert.equal(decoded.grid[0].length, 4);
+  assert.deepEqual(decoded.start, start);
+  assert.deepEqual(decoded.end, end);
+  assert.equal(decoded.grid[0][0].type, "start");
+  assert.equal(decoded.grid[2][3].type, "end");
+  assert.equal(decoded.grid[1][1].type, "wall");
+  assert.equal(decoded.grid[1][2].type, "weight");
+  assert.equal(decoded.grid[1][2].weight, 5);
+  assert.equal(decoded.grid[0][1].type, "empty");
+  assert.equal(decoded.grid[2][0].type, "empty");
+
+  const again = PathCore.decodeMap(PathCore.encodeMap(decoded.grid, decoded.start, decoded.end));
+  assert.equal(again.grid[1][1].type, "wall");
+  assert.equal(again.grid[1][2].type, "weight");
+  assert.deepEqual(again.start, start);
+  assert.deepEqual(again.end, end);
+});
+
+test("decodeMap rejects invalid strings", () => {
+  assert.equal(PathCore.decodeMap(""), null);
+  assert.equal(PathCore.decodeMap("not-a-map"), null);
+  assert.equal(PathCore.decodeMap("3x4;0,0;2,3;###"), null);
+  assert.equal(PathCore.decodeMap(null), null);
+});

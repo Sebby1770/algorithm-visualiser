@@ -302,7 +302,10 @@ class SearchRunner {
       await new Promise((r) => setTimeout(r, 50));
       if (this.stopped) throw new Error("STOPPED");
     }
-    const delay = 202 - this.speedSlider.value * 2;
+    let delay = 202 - this.speedSlider.value * 2;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      delay = 0;
+    }
     await new Promise((r) => setTimeout(r, delay));
     this.tickElapsed();
   }

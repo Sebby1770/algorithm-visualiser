@@ -244,13 +244,15 @@ class AudioManager {
 }
 
 class GridView {
-  constructor(container) {
+  constructor(container, { showCursor = false } = {}) {
     this.container = container;
     this.cells = [];
     this.rows = 0;
     this.cols = 0;
     this.overlay = this.emptyOverlay();
     this.frontierKey = null;
+    this.showCursor = showCursor;
+    this.cursor = { r: 0, c: 0 };
   }
 
   emptyOverlay() {
@@ -266,6 +268,10 @@ class GridView {
     this.cols = cols;
     this.overlay = this.emptyOverlay();
     this.frontierKey = null;
+    this.cursor = {
+      r: Math.max(0, Math.min(this.cursor.r, Math.max(0, rows - 1))),
+      c: Math.max(0, Math.min(this.cursor.c, Math.max(0, cols - 1))),
+    };
     this.container.style.setProperty("--path-cols", String(cols));
     this.container.setAttribute("aria-rowcount", String(rows));
     this.container.setAttribute("aria-colcount", String(cols));
@@ -310,6 +316,9 @@ class GridView {
     if (this.overlay.visited.has(id)) btn.classList.add("is-visited");
     if (this.overlay.frontier.has(id)) btn.classList.add("is-frontier");
     if (this.overlay.path.has(id)) btn.classList.add("is-path");
+    if (this.showCursor && this.cursor.r === r && this.cursor.c === c) {
+      btn.classList.add("is-cursor");
+    }
 
     let glyph = "";
     if (cell.type === "start") glyph = "S";
@@ -360,12 +369,21 @@ class GridView {
     }
     this.paintAll(grid);
   }
+
+  setCursor(grid, r, c) {
+    const nr = Math.max(0, Math.min(this.rows - 1, r));
+    const nc = Math.max(0, Math.min(this.cols - 1, c));
+    const prev = this.cursor;
+    this.cursor = { r: nr, c: nc };
+    if (prev && grid) this.paintCell(grid, prev.r, prev.c);
+    if (grid) this.paintCell(grid, nr, nc);
+  }
 }
 
 class PathLabApp {
   constructor() {
     this.audio = new AudioManager();
-    this.viewA = new GridView(dom.pathGrid);
+    this.viewA = new GridView(dom.pathGrid, { showCursor: true });
     this.viewB = new GridView(dom.pathGridRace);
     this.grid = [];
     this.start = { r: 0, c: 0 };
@@ -377,6 +395,8 @@ class PathLabApp {
     this.history = this.loadHistory();
     this.toastTimer = null;
     this.pointer = { painting: false, brush: null, terminal: null };
+    this.cursorMoveTerminal = null;
+    this.pendingSharedMap = null;
     this.animStartedAt = 0;
   }
 
@@ -390,7 +410,12 @@ class PathLabApp {
     this.updateTeachingPanel();
     this.updateRaceVisibility();
     this.renderHistory();
-    this.generateBoard();
+    if (this.pendingSharedMap) {
+      this.applyDecodedMap(this.pendingSharedMap);
+      this.pendingSharedMap = null;
+    } else {
+      this.generateBoard();
+    }
     this.registerServiceWorker();
     this.setStatus("Ready — press S to search or G to generate a maze");
   }
@@ -473,6 +498,11 @@ class PathLabApp {
     this.bindPointer(dom.pathGrid);
     this.bindPointer(dom.pathGridRace);
 
+    if (dom.pathGrid) {
+      dom.pathGrid.tabIndex = 0;
+      dom.pathGrid.addEventListener("keydown", (e) => this.handleGridKey(e));
+    }
+
     window.addEventListener("pointerup", () => this.endPointer());
     window.addEventListener("pointercancel", () => this.endPointer());
 
@@ -490,6 +520,15 @@ class PathLabApp {
   handleKeyboard(e) {
     if (e.target.closest(".learning-card")) return;
     if (e.target.matches("input, select, textarea")) return;
+
+    const gridFocused = e.target.closest(".path-grid");
+    const arrowKey =
+      e.code === "ArrowUp" ||
+      e.code === "ArrowDown" ||
+      e.code === "ArrowLeft" ||
+      e.code === "ArrowRight";
+    if (gridFocused && (arrowKey || e.code === "Enter")) return;
+    if (gridFocused && e.code === "Space" && !this.isRunning) return;
 
     switch (e.code) {
       case "Space":
@@ -509,6 +548,11 @@ class PathLabApp {
         if (!this.isRunning) this.clearPath();
         break;
       case "Escape":
+        if (this.cursorMoveTerminal) {
+          this.cursorMoveTerminal = null;
+          this.setStatus("Move cancelled");
+          break;
+        }
         this.stopSearch();
         break;
       case "Digit1":
@@ -526,6 +570,62 @@ class PathLabApp {
       default:
         break;
     }
+  }
+
+  handleGridKey(e) {
+    const arrows =
+      e.code === "ArrowUp" ||
+      e.code === "ArrowDown" ||
+      e.code === "ArrowLeft" ||
+      e.code === "ArrowRight";
+    const paint = e.code === "Space" || e.code === "Enter";
+    if (!arrows && !paint) return;
+
+    if (arrows) {
+      e.preventDefault();
+      this.moveGridCursor(e.code);
+      return;
+    }
+
+    if (this.isRunning) return;
+    e.preventDefault();
+    this.activateCursorCell();
+  }
+
+  moveGridCursor(code) {
+    if (!this.grid.length) return;
+    const { r, c } = this.viewA.cursor;
+    let nr = r;
+    let nc = c;
+    if (code === "ArrowUp") nr--;
+    else if (code === "ArrowDown") nr++;
+    else if (code === "ArrowLeft") nc--;
+    else if (code === "ArrowRight") nc++;
+    nr = Math.max(0, Math.min(this.grid.length - 1, nr));
+    nc = Math.max(0, Math.min(this.grid[0].length - 1, nc));
+    if (this.cursorMoveTerminal) this.moveTerminal(this.cursorMoveTerminal, nr, nc);
+    this.viewA.setCursor(this.grid, nr, nc);
+  }
+
+  activateCursorCell() {
+    if (this.isRunning || !this.grid.length) return;
+    const { r, c } = this.viewA.cursor;
+    if (this.cursorMoveTerminal) {
+      this.cursorMoveTerminal = null;
+      this.setStatus("Placed " + (this.grid[r][c].type === "end" ? "end" : "start"));
+      return;
+    }
+    if (r === this.start.r && c === this.start.c) {
+      this.cursorMoveTerminal = "start";
+      this.setStatus("Moving start — arrows to place, Space to drop");
+      return;
+    }
+    if (r === this.end.r && c === this.end.c) {
+      this.cursorMoveTerminal = "end";
+      this.setStatus("Moving end — arrows to place, Space to drop");
+      return;
+    }
+    this.paintAt(r, c, this.getBrush());
   }
 
   getRows() {
@@ -591,6 +691,7 @@ class PathLabApp {
 
   generateBoard() {
     if (this.isRunning) return;
+    this.cursorMoveTerminal = null;
     const rows = this.getRows();
     const cols = this.getCols();
     const maze = dom.maze.value;
@@ -620,6 +721,7 @@ class PathLabApp {
         this.placeDefaultTerminals(grid);
         this.grid = grid;
         this.rebuildViews();
+        this.viewA.setCursor(this.grid, this.start.r, this.start.c);
         this.resetMetrics();
         this.setStatus(`Empty board ${rows}×${cols} — drag S/E, paint walls`);
         return;
@@ -628,16 +730,36 @@ class PathLabApp {
     this.grid = grid;
     this.syncTerminalsFromGrid();
     this.rebuildViews();
+    this.viewA.setCursor(this.grid, this.start.r, this.start.c);
     this.resetMetrics();
     this.setStatus(`Generated ${MAZE_LABELS[maze] || maze} (${rows}×${cols})`);
   }
 
+  applyDecodedMap(decoded) {
+    this.grid = decoded.grid;
+    this.start = { r: decoded.start.r, c: decoded.start.c };
+    this.end = { r: decoded.end.r, c: decoded.end.c };
+    const rows = this.grid.length;
+    const cols = this.grid[0].length;
+    this.clamp(dom.rows, rows);
+    this.clamp(dom.cols, cols);
+    dom.rowsValue.textContent = dom.rows.value;
+    dom.colsValue.textContent = dom.cols.value;
+    if (dom.maze) dom.maze.value = "empty";
+    this.rebuildViews();
+    this.viewA.setCursor(this.grid, this.start.r, this.start.c);
+    this.resetMetrics();
+    this.setStatus(`Loaded shared map ${rows}×${cols}`);
+  }
+
   resetBoard() {
     if (this.isRunning) return;
+    this.cursorMoveTerminal = null;
     dom.maze.value = "empty";
     this.grid = PathCore.makeGrid(this.getRows(), this.getCols());
     this.placeDefaultTerminals(this.grid);
     this.rebuildViews();
+    this.viewA.setCursor(this.grid, this.start.r, this.start.c);
     this.resetMetrics();
     this.setStatus("Board reset");
     this.announce("Board reset.");
@@ -661,6 +783,7 @@ class PathLabApp {
     e.preventDefault();
     const r = Number(cell.dataset.r);
     const c = Number(cell.dataset.c);
+    if (e.currentTarget === dom.pathGrid) this.viewA.setCursor(this.grid, r, c);
     if (e.currentTarget.setPointerCapture) {
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -787,6 +910,14 @@ class PathLabApp {
   }
 
   getDelay() {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches &&
+      !dom.stepMode.checked
+    ) {
+      return 0;
+    }
     const s = Number(dom.speed.value);
     if (s >= 97) return 0;
     return Math.max(0, Math.round(((100 - s) * (100 - s)) / 180));
@@ -1180,6 +1311,13 @@ class PathLabApp {
     }
     if (dom.stepMode.checked) params.set("step", "1");
     if (dom.teachingMode.checked) params.set("teach", "1");
+    if (this.grid && this.grid.length) {
+      try {
+        params.set("map", PathCore.encodeMap(this.grid, this.start, this.end));
+      } catch (_) {
+        /* omit map if encode fails */
+      }
+    }
     return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
   }
 
@@ -1223,6 +1361,17 @@ class PathLabApp {
     }
     dom.stepMode.checked = params.get("step") === "1";
     dom.teachingMode.checked = params.get("teach") === "1";
+    if (params.has("map")) {
+      try {
+        const decoded = PathCore.decodeMap(params.get("map"));
+        if (decoded) {
+          this.pendingSharedMap = decoded;
+          if (dom.maze) dom.maze.value = "empty";
+        }
+      } catch {
+        this.pendingSharedMap = null;
+      }
+    }
   }
 
   async copyShareUrl() {

@@ -71,7 +71,9 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 - Live comparisons, swaps, writes, and elapsed ms
 - Pause / Resume, Stop, and Step Mode
 - Algorithm Race (dual pane)
-- Teaching Mode (narrated steps)
+- Teaching Mode (narrated steps) — merge sort compares **aux keys**, not overwritten live bars
+- Identity colors (stability hues from original indices; equal heights stay distinguishable)
+- Bar values shown when n ≤ 24
 - Quiz Mode (guess the algorithm)
 - Presentation Mode
 - Access heatmap + operations sparkline
@@ -118,13 +120,14 @@ Carved mazes prefer even/even passage cells. Even dimensions get a short corrido
 ### Features
 
 - Interactive grid: drag to paint **Wall / Weight / Erase**; drag **S** / **E** to move terminals
+- Keyboard editor: focus the grid — **Arrows move · Space paint** (Space/Enter on S/E picks up the terminal)
 - Diagonal movement toggle (no corner-cutting through walls)
 - Race mode + algorithm tournament (rank: path cost → nodes expanded → time)
 - Teaching Mode, Step Mode, pause / resume / stop
 - Algorithm profile + learning cards
 - Run history (last 8, `localStorage` key `pathLabHistory`)
-- Share URL encodes algorithm, maze, rows, cols, speed, diagonal
-- Keyboard: `Space` pause · `S` start · `G` maze · `R` reset · `C` clear path · `Esc` stop · `1` wall · `2` weight · `3` erase
+- Share URL encodes algorithm, maze, rows, cols, speed, diagonal, and the painted **map** (`rowsxcols;sr,sc;er,ec;rle`)
+- Keyboard: `Arrows` cursor · `Space` paint (grid) / pause · `S` start · `G` maze · `R` reset · `C` clear path · `Esc` stop · `1` wall · `2` weight · `3` erase
 
 Glyphs (not color alone): **S** start, **E** end, **●** weight.
 
@@ -159,8 +162,9 @@ Each core routine returns `{ found, index, probes, probeOrder }` and **never mut
 - Lab switcher in the top bar: Sort Lab · Path Lab · Search Lab
 - Dark / light theme — `localStorage` key `theme` (shared)
 - Sound beeps (Web Audio) — `localStorage` key `sound` (shared)
-- PWA manifest + service worker (`algo-lab-v6`) for offline use
+- PWA manifest + service worker (`algo-lab-v6.2`) for offline use
 - `aria-live` status and teaching narration
+- `:focus-visible` outlines; `prefers-reduced-motion` skips animation delay
 
 ## File structure
 

@@ -276,6 +276,7 @@ const dom = {
   shareUrlBtn: $("shareUrlBtn"),
   presentationBtn: $("presentationBtn"),
   quizMode: $("quizMode"),
+  identityColors: $("identityColors"),
   quizScore: $("quizScore"),
   quizPanel: $("quizPanel"),
   quizGuessGrid: $("quizGuessGrid"),
@@ -632,8 +633,10 @@ class SortRunner {
     this.heatmapEl = heatmapEl;
     this.label = label;
     this.array = [];
+    this.ids = [];
     this.bars = [];
     this.accessCounts = [];
+    this.identityColors = false;
     this.metrics = new Metrics();
     this.paused = false;
     this.stopped = false;
@@ -658,6 +661,7 @@ class SortRunner {
     stepMode,
     silent = false,
     teachingMode = false,
+    identityColors,
     onNarrate,
     onOperation,
     onVisualUpdate,
@@ -668,6 +672,7 @@ class SortRunner {
     this.stepMode = stepMode;
     this.silent = silent;
     this.teachingMode = teachingMode;
+    if (identityColors !== undefined) this.identityColors = identityColors;
     this.onNarrate = onNarrate || null;
     this.onOperation = onOperation || null;
     this.onVisualUpdate = onVisualUpdate || null;
@@ -676,9 +681,36 @@ class SortRunner {
 
   setArray(data) {
     this.array = [...data];
+    this.ids = data.map((_, i) => i);
     this.accessCounts = new Array(data.length).fill(0);
     this.renderBars();
     this.renderHeatmap();
+  }
+
+  identityHue(id) {
+    return `hsl(${(Number(id) * 47) % 360} 70% 50%)`;
+  }
+
+  paintBar(i) {
+    if (this.silent) return;
+    const bar = this.bars[i];
+    if (!bar) return;
+    const value = this.array[i];
+    bar.style.height = `${value}%`;
+    if (this.array.length <= 24) bar.textContent = String(value);
+    else bar.textContent = "";
+    if (this.identityColors) {
+      bar.style.setProperty("--bar-identity", this.identityHue(this.ids[i]));
+      bar.classList.add("identity");
+    } else {
+      bar.style.removeProperty("--bar-identity");
+      bar.classList.remove("identity");
+    }
+  }
+
+  applyBarStyles() {
+    if (this.silent) return;
+    for (let i = 0; i < this.bars.length; i++) this.paintBar(i);
   }
 
   renderBars() {
@@ -692,6 +724,7 @@ class SortRunner {
       this.container.appendChild(bar);
       return bar;
     });
+    this.applyBarStyles();
   }
 
   clearStateClasses() {
@@ -784,7 +817,14 @@ class SortRunner {
       if (this.stopped) throw new Error("STOPPED");
     }
 
-    const delay = 202 - this.speedSlider.value * 2;
+    let delay = 202 - this.speedSlider.value * 2;
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      delay = 0;
+    }
     await new Promise((r) => setTimeout(r, delay));
     this.tickElapsed();
   }
@@ -812,6 +852,21 @@ class SortRunner {
     await this.waitStep();
   }
 
+  /**
+   * Compare auxiliary merge keys — not the live bars at i/j, which may already
+   * have been overwritten earlier in this merge.
+   */
+  async compareAux(leftIdx, rightIdx, leftVal, rightVal) {
+    this.metrics.comparisons++;
+    this.trackAccess(leftIdx, rightIdx);
+    this.audio?.compare();
+    this.updateMetricsDisplay();
+    this.narrate(`Comparing merge keys ${leftVal} (left ${leftIdx}) vs ${rightVal} (right ${rightIdx})`);
+    this.recordOperation();
+    this.notifyVisualUpdate();
+    await this.waitStep();
+  }
+
   clearCompare(i, j) {
     this.bars[i]?.classList.remove("compare");
     this.bars[j]?.classList.remove("compare");
@@ -822,9 +877,10 @@ class SortRunner {
     this.metrics.writes += 2;
     this.trackAccess(i, j);
     [this.array[i], this.array[j]] = [this.array[j], this.array[i]];
+    [this.ids[i], this.ids[j]] = [this.ids[j], this.ids[i]];
     if (!this.silent) {
-      this.bars[i].style.height = `${this.array[i]}%`;
-      this.bars[j].style.height = `${this.array[j]}%`;
+      this.paintBar(i);
+      this.paintBar(j);
       this.bars[i].classList.add("swap");
       this.bars[j].classList.add("swap");
     }
@@ -838,12 +894,13 @@ class SortRunner {
     this.bars[j]?.classList.remove("swap");
   }
 
-  async write(i, value) {
+  async write(i, value, id) {
     this.metrics.writes++;
     this.trackAccess(i);
     this.array[i] = value;
+    if (id !== undefined && id !== null) this.ids[i] = id;
     if (!this.silent) {
-      this.bars[i].style.height = `${value}%`;
+      this.paintBar(i);
       this.bars[i].classList.add("write");
     }
     this.audio?.write();
@@ -982,22 +1039,24 @@ class SortRunner {
 
   async mergeSort() {
     const aux = [...this.array];
-    await this.mergeSortRange(0, this.array.length - 1, aux);
+    const auxIds = [...this.ids];
+    await this.mergeSortRange(0, this.array.length - 1, aux, auxIds);
   }
 
-  async mergeSortRange(low, high, aux) {
+  async mergeSortRange(low, high, aux, auxIds) {
     if (low >= high) return;
     const mid = Math.floor((low + high) / 2);
     this.narrate(`Merge sort: dividing range [${low}…${high}] at midpoint ${mid}.`);
-    await this.mergeSortRange(low, mid, aux);
-    await this.mergeSortRange(mid + 1, high, aux);
-    await this.merge(low, mid, high, aux);
+    await this.mergeSortRange(low, mid, aux, auxIds);
+    await this.mergeSortRange(mid + 1, high, aux, auxIds);
+    await this.merge(low, mid, high, aux, auxIds);
   }
 
-  async merge(low, mid, high, aux) {
+  async merge(low, mid, high, aux, auxIds) {
     this.narrate(`Merging sorted halves [${low}…${mid}] and [${mid + 1}…${high}].`);
     for (let k = low; k <= high; k++) {
       aux[k] = this.array[k];
+      auxIds[k] = this.ids[k];
     }
 
     let i = low;
@@ -1005,26 +1064,27 @@ class SortRunner {
     let k = low;
 
     while (i <= mid && j <= high) {
-      await this.compare(i, j);
-      if (aux[i] <= aux[j]) {
-        await this.write(k, aux[i]);
+      const leftVal = aux[i];
+      const rightVal = aux[j];
+      await this.compareAux(i, j, leftVal, rightVal);
+      if (leftVal <= rightVal) {
+        await this.write(k, leftVal, auxIds[i]);
         i++;
       } else {
-        await this.write(k, aux[j]);
+        await this.write(k, rightVal, auxIds[j]);
         j++;
       }
-      this.clearCompare(i, j);
       k++;
     }
 
     while (i <= mid) {
-      await this.write(k, aux[i]);
+      await this.write(k, aux[i], auxIds[i]);
       i++;
       k++;
     }
 
     while (j <= high) {
-      await this.write(k, aux[j]);
+      await this.write(k, aux[j], auxIds[j]);
       j++;
       k++;
     }
@@ -1106,6 +1166,7 @@ class SortRunner {
 
       for (let i = gap; i < n; i++) {
         const temp = this.array[i];
+        const tempId = this.ids[i];
         let j = i;
         if (!this.silent) this.bars[i]?.classList.add("gap");
 
@@ -1117,7 +1178,7 @@ class SortRunner {
           );
 
           if (this.array[j - gap] > temp) {
-            await this.write(j, this.array[j - gap]);
+            await this.write(j, this.array[j - gap], this.ids[j - gap]);
             j -= gap;
           } else {
             this.clearCompare(j - gap, j);
@@ -1129,7 +1190,7 @@ class SortRunner {
         }
 
         if (j !== i) {
-          await this.write(j, temp);
+          await this.write(j, temp, tempId);
         }
         this.bars[i]?.classList.remove("gap");
       }
@@ -1172,10 +1233,12 @@ class SortRunner {
       count[i] += count[i - 1];
     }
 
+    const outputIds = new Array(n);
     for (let i = n - 1; i >= 0; i--) {
       const digit = Math.floor(this.array[i] / exp) % 10;
       const pos = count[digit] - 1;
       output[pos] = this.array[i];
+      outputIds[pos] = this.ids[i];
       this.narrate(`Placing ${this.array[i]} into bucket position ${pos} (digit ${digit}).`);
       count[digit]--;
       if (!this.silent) {
@@ -1186,7 +1249,7 @@ class SortRunner {
     }
 
     for (let i = 0; i < n; i++) {
-      await this.write(i, output[i]);
+      await this.write(i, output[i], outputIds[i]);
       if (!this.silent) {
         this.bars[i]?.classList.add("digit");
         await this.waitStep();
@@ -1227,11 +1290,13 @@ class SortRunner {
     }
 
     const output = new Array(n);
+    const outputIds = new Array(n);
     for (let i = n - 1; i >= 0; i--) {
       const bucket = this.array[i] - min;
       this.trackAccess(i);
       const pos = count[bucket] - 1;
       output[pos] = this.array[i];
+      outputIds[pos] = this.ids[i];
       count[bucket]--;
       if (!this.silent) this.bars[i]?.classList.add("bucket");
       this.onCountingArrayUpdate?.(count, min, max, bucket);
@@ -1243,7 +1308,7 @@ class SortRunner {
     }
 
     for (let i = 0; i < n; i++) {
-      await this.write(i, output[i]);
+      await this.write(i, output[i], outputIds[i]);
       if (!this.silent) {
         this.bars[i]?.classList.add("bucket");
         await this.waitStep();
@@ -1503,6 +1568,10 @@ class SortLabApp {
 
     dom.teachingMode.addEventListener("change", () => this.updateTeachingPanel());
 
+    if (dom.identityColors) {
+      dom.identityColors.addEventListener("change", () => this.syncIdentityColors());
+    }
+
     dom.quizMode.addEventListener("change", () => {
       this.updateProfile();
       if (!dom.quizMode.checked) {
@@ -1601,6 +1670,8 @@ class SortLabApp {
     this.baseArray = result.data;
     dom.size.value = result.data.length;
     dom.sizeValue.textContent = result.data.length;
+    this.primary.identityColors = this.identityColorsEnabled();
+    this.secondary.identityColors = this.identityColorsEnabled();
     this.primary.setArray(this.baseArray);
     this.secondary.setArray(this.baseArray);
     this.primary.metrics.reset();
@@ -1624,6 +1695,8 @@ class SortLabApp {
     const type = dom.dataset.value;
     const size = this.getSize();
     this.baseArray = generateDataset(type, size);
+    this.primary.identityColors = this.identityColorsEnabled();
+    this.secondary.identityColors = this.identityColorsEnabled();
     this.primary.setArray(this.baseArray);
     this.secondary.setArray(this.baseArray);
     this.primary.metrics.reset();
@@ -1886,6 +1959,14 @@ class SortLabApp {
       if (bar) {
         bar.style.height = `${value}%`;
         stateClasses.forEach((cls) => bar.classList.toggle(cls, sourceBar?.classList.contains(cls)));
+        if (runner.identityColors) {
+          bar.style.setProperty("--bar-identity", runner.identityHue(runner.ids[i]));
+          bar.classList.add("identity");
+        } else {
+          bar.style.removeProperty("--bar-identity");
+          bar.classList.remove("identity");
+        }
+        bar.textContent = runner.array.length <= 24 ? String(value) : "";
       }
       if (heatCell) {
         heatCell.style.background = heatmapColor((runner.accessCounts[i] || 0) / maxAccess);
@@ -1951,6 +2032,19 @@ class SortLabApp {
     if (dom.dataset.value === "custom") dom.size.disabled = true;
   }
 
+  identityColorsEnabled() {
+    return !!(dom.identityColors && dom.identityColors.checked);
+  }
+
+  syncIdentityColors() {
+    const on = this.identityColorsEnabled();
+    this.primary.identityColors = on;
+    this.secondary.identityColors = on;
+    this.primary.applyBarStyles();
+    this.secondary.applyBarStyles();
+    this.syncPresentation();
+  }
+
   configureRunners({ silent = false } = {}) {
     const teaching = dom.teachingMode.checked;
     const config = {
@@ -1959,6 +2053,7 @@ class SortLabApp {
       stepMode: dom.stepMode.checked,
       silent,
       teachingMode: teaching,
+      identityColors: this.identityColorsEnabled(),
       onNarrate: (msg) => this.setTeaching(msg),
       onOperation: silent ? null : (total) => this.opsChart.push(total),
       onVisualUpdate: silent ? null : (runner) => {

@@ -2,6 +2,22 @@
 
 All notable changes to Algo Lab (Algorithm Visualizer).
 
+## [2026-08-26] — v6.2 teaching honesty & shareable maps
+
+### Fixed
+- **Merge sort teaching compare** uses auxiliary keys (`compareAux`) instead of live bars after writes, so narration matches the values actually being merged.
+
+### Added
+- **Identity / stability colors** in Sort Lab — optional hues from original indices so equal keys stay distinguishable (stable vs unstable sorts)
+- **Bar value labels** when n ≤ 24
+- **Shareable Path Lab maps** — `encodeMap` / `decodeMap` RLE in `pathfinding-core.js`; Share URL includes a `map` param
+- **Keyboard maze editor** — focus the grid, arrows move a cursor, Space/Enter paint (or pick up S/E)
+- **Reduced-motion** CSS and zero animation delay in Sort / Path labs when `prefers-reduced-motion: reduce`
+- `:focus-visible` outlines and `.path-cell.is-cursor` styling
+
+### Changed
+- PWA cache bumped to `algo-lab-v6.2`
+
 ## [2026-08-26] — v6.1 teaching correctness
 
 ### Fixed
