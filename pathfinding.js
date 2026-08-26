@@ -8,7 +8,7 @@
      pathLabHistory — last 8 Path Lab runs
    ============================================================ */
 
-const ALGORITHM_IDS = ["bfs", "dfs", "dijkstra", "astar", "greedy", "bidirectionalBfs"];
+const ALGORITHM_IDS = ["bfs", "dfs", "dijkstra", "astar", "greedy", "bidirectionalBfs", "weightedAstar", "idaStar"];
 
 const ALGORITHM_PROFILES = {
   bfs: {
@@ -71,6 +71,26 @@ const ALGORITHM_PROFILES = {
     heuristic: "None",
     description: "Runs BFS from both start and end until the frontiers meet. Often much faster on open maps.",
   },
+  weightedAstar: {
+    name: "Weighted A*",
+    time: "O((V + E) log V)",
+    space: "O(V)",
+    weighted: true,
+    complete: true,
+    optimal: "No (w=1.5)",
+    heuristic: "Manhattan / Euclidean × 1.5",
+    description: "A* with a scaled heuristic (weight 1.5). Faster and greedier; paths may be slightly longer.",
+  },
+  idaStar: {
+    name: "IDA*",
+    time: "O(b^d)",
+    space: "O(d)",
+    weighted: true,
+    complete: true,
+    optimal: "Yes (admissible h)",
+    heuristic: "Manhattan / Euclidean",
+    description: "Iterative deepening A*: DFS with a rising f-cost bound. Tiny memory, more re-expansions.",
+  },
 };
 
 const LEARNING_CARDS = {
@@ -98,6 +118,14 @@ const LEARNING_CARDS = {
     trivia: "Two searches meeting in the middle can turn an O(b^d) frontier into roughly O(b^{d/2}) — a huge win on open maps.",
     useCase: "Meeting-in-the-middle queries: word ladders, unweighted maps, and some bidirectional Dijkstra variants.",
   },
+  weightedAstar: {
+    trivia: "Weighted A* (WA*) inflates h by w>1. With w=1.5 you often expand far fewer nodes than A* while staying near-optimal.",
+    useCase: "Anytime planning in robotics and games when a good path now beats a perfect path later.",
+  },
+  idaStar: {
+    trivia: "IDA* was introduced by Korf in 1985. It solves 15-puzzles with A*’s optimality and DFS’s memory.",
+    useCase: "Large state spaces (puzzles, combinational search) where storing an Open set would blow RAM.",
+  },
 };
 
 const MAZE_LABELS = {
@@ -107,6 +135,7 @@ const MAZE_LABELS = {
   division: "Recursive Division",
   binary: "Binary Tree",
   scatter: "Scatter Walls",
+  kruskal: "Kruskal",
 };
 
 const HISTORY_KEY = "pathLabHistory";
@@ -582,6 +611,9 @@ class PathLabApp {
         break;
       case "scatter":
         grid = PathCore.scatterWalls(rows, cols, 0.28);
+        break;
+      case "kruskal":
+        grid = PathCore.mazeKruskal(rows, cols);
         break;
       default:
         grid = PathCore.makeGrid(rows, cols);

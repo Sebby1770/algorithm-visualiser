@@ -1,11 +1,11 @@
 /* ============================================================
-   Sorting Algorithm Lab v4
+   Sorting Algorithm Lab v6
    Vanilla JS — no frameworks
    ============================================================ */
 
 const ALGORITHM_IDS = [
   "bubble", "selection", "insertion", "merge", "quick", "heap", "shell", "radix",
-  "counting", "cocktail",
+  "counting", "cocktail", "comb", "gnome", "oddeven", "pancake",
 ];
 
 // ---------- Algorithm metadata ----------
@@ -110,6 +110,46 @@ const ALGORITHM_PROFILES = {
     memory: "O(1)",
     description: "Bidirectional bubble sort — sweeps forward then backward each pass.",
   },
+  comb: {
+    name: "Comb Sort",
+    best: "O(n log n)",
+    avg: "O(n² / 2ᵖ)",
+    worst: "O(n²)",
+    stable: false,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Bubble sort with a shrinking gap (factor 1.3) that eliminates turtles early.",
+  },
+  gnome: {
+    name: "Gnome Sort",
+    best: "O(n)",
+    avg: "O(n²)",
+    worst: "O(n²)",
+    stable: true,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Like insertion sort, but swaps backward one step at a time — the garden-gnome algorithm.",
+  },
+  oddeven: {
+    name: "Odd-Even Sort",
+    best: "O(n)",
+    avg: "O(n²)",
+    worst: "O(n²)",
+    stable: true,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Alternating odd/even adjacent comparison passes; maps cleanly onto parallel hardware.",
+  },
+  pancake: {
+    name: "Pancake Sort",
+    best: "O(n)",
+    avg: "O(n²)",
+    worst: "O(n²)",
+    stable: false,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Sorts by prefix reversals: flip the max to the front, then into place.",
+  },
 };
 
 const LEARNING_CARDS = {
@@ -152,6 +192,22 @@ const LEARNING_CARDS = {
   cocktail: {
     trivia: "Cocktail shaker sort is also called bidirectional bubble sort or shaker sort.",
     useCase: "Teaching bidirectional scanning — slightly better than bubble on reversed arrays.",
+  },
+  comb: {
+    trivia: "Comb sort’s 1.3 shrink factor was chosen empirically — it is still one of the best simple gap sequences.",
+    useCase: "A drop-in upgrade over bubble sort when you want fewer passes without extra memory.",
+  },
+  gnome: {
+    trivia: "Hamidoon Sallam described gnome sort as a garden gnome sorting flower pots: step forward, or swap back.",
+    useCase: "Tiny in-place sorts and teaching the relationship between insertion sort and adjacent swaps.",
+  },
+  oddeven: {
+    trivia: "Odd-even (Brick) sort is the comparison network cousin of bubble sort, popular on early parallel machines.",
+    useCase: "GPU and hardware pipelines where even/odd neighbor compares can run simultaneously.",
+  },
+  pancake: {
+    trivia: "Pancake sorting asks: how many spatula flips to sort a stack? Bill Gates published a bound on it in 1979.",
+    useCase: "Rewriting prefixes in genome rearrangement and any “only reverse a prefix” constraint.",
   },
 };
 
@@ -833,6 +889,10 @@ class SortRunner {
       radix: () => this.radixSort(),
       counting: () => this.countingSort(),
       cocktail: () => this.cocktailShakerSort(),
+      comb: () => this.combSort(),
+      gnome: () => this.gnomeSort(),
+      oddeven: () => this.oddEvenSort(),
+      pancake: () => this.pancakeSort(),
     };
 
     try {
@@ -1220,6 +1280,116 @@ class SortRunner {
     }
 
     if (n > 0) this.markSorted(start);
+  }
+
+  async combSort() {
+    const n = this.array.length;
+    const shrink = 1.3;
+    let gap = n;
+    let sorted = false;
+
+    while (!sorted) {
+      gap = Math.floor(gap / shrink);
+      if (gap <= 1) {
+        gap = 1;
+        sorted = true;
+      }
+      this.narrate(`Comb sort: comparing pairs ${gap} apart.`);
+
+      for (let i = 0; i + gap < n; i++) {
+        await this.compare(i, i + gap);
+        if (this.array[i] > this.array[i + gap]) {
+          await this.swap(i, i + gap);
+          sorted = false;
+        }
+        this.clearCompare(i, i + gap);
+      }
+    }
+  }
+
+  async gnomeSort() {
+    const n = this.array.length;
+    let i = 0;
+    this.narrate("Gnome sort: walk forward; swap back when a pair is out of order.");
+
+    while (i < n) {
+      if (i === 0) {
+        i++;
+        continue;
+      }
+      await this.compare(i - 1, i);
+      if (this.array[i] >= this.array[i - 1]) {
+        this.clearCompare(i - 1, i);
+        i++;
+      } else {
+        await this.swap(i - 1, i);
+        this.clearCompare(i - 1, i);
+        i--;
+      }
+    }
+  }
+
+  async oddEvenSort() {
+    const n = this.array.length;
+    let sorted = false;
+
+    while (!sorted) {
+      sorted = true;
+      this.narrate("Odd-even sort: odd pass (indices 1, 3, 5…).");
+      for (let i = 1; i < n - 1; i += 2) {
+        await this.compare(i, i + 1);
+        if (this.array[i] > this.array[i + 1]) {
+          await this.swap(i, i + 1);
+          sorted = false;
+        }
+        this.clearCompare(i, i + 1);
+      }
+
+      this.narrate("Odd-even sort: even pass (indices 0, 2, 4…).");
+      for (let i = 0; i < n - 1; i += 2) {
+        await this.compare(i, i + 1);
+        if (this.array[i] > this.array[i + 1]) {
+          await this.swap(i, i + 1);
+          sorted = false;
+        }
+        this.clearCompare(i, i + 1);
+      }
+    }
+  }
+
+  async pancakeSort() {
+    const n = this.array.length;
+
+    const flip = async (k) => {
+      this.narrate(`Pancake flip: reversing the prefix [0…${k}].`);
+      let i = 0;
+      let j = k;
+      while (i < j) {
+        await this.swap(i, j);
+        i++;
+        j--;
+      }
+    };
+
+    for (let curr = n; curr > 1; curr--) {
+      let maxIdx = 0;
+      this.narrate(`Pancake sort: finding the max in the unsorted prefix [0…${curr - 1}].`);
+      for (let i = 1; i < curr; i++) {
+        const prev = maxIdx;
+        await this.compare(i, prev);
+        if (this.array[i] > this.array[prev]) maxIdx = i;
+        this.clearCompare(i, prev);
+      }
+
+      if (maxIdx === curr - 1) {
+        this.markSorted(curr - 1);
+        continue;
+      }
+      if (maxIdx !== 0) await flip(maxIdx);
+      await flip(curr - 1);
+      this.markSorted(curr - 1);
+    }
+    if (n > 0) this.markSorted(0);
   }
 }
 
@@ -1899,19 +2069,35 @@ class SortLabApp {
     const size = data.length;
     const results = [];
 
-    this.setStatus("Running benchmark tournament on all 10 algorithms…");
+    this.setStatus("Running benchmark tournament on all 14 algorithms…");
     this.announce("Benchmark tournament started.");
 
+    const useCore = typeof SortCore !== "undefined";
+
     for (const algo of ALGORITHM_IDS) {
-      this.primary.setArray(data);
-      this.configureRunners({ silent: true });
       this.setStatus(`Tournament: running ${ALGORITHM_PROFILES[algo].name}…`);
-      await this.primary.run(algo);
+      let metrics;
+      if (useCore) {
+        const t0 = performance.now();
+        const result = SortCore.sort(algo, data);
+        metrics = {
+          comparisons: result.comparisons,
+          swaps: result.swaps,
+          writes: result.writes,
+          elapsedMs: Math.round(performance.now() - t0),
+        };
+        await new Promise((r) => setTimeout(r, 0));
+      } else {
+        this.configureRunners({ silent: true });
+        this.primary.setArray(data);
+        await this.primary.run(algo);
+        metrics = this.pickMetrics(this.primary.metrics);
+      }
       results.push({
         algorithm: algo,
         name: ALGORITHM_PROFILES[algo].name,
         theoretical: ALGORITHM_PROFILES[algo].avg,
-        ...this.pickMetrics(this.primary.metrics),
+        ...metrics,
       });
     }
 

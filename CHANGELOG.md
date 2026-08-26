@@ -2,6 +2,28 @@
 
 All notable changes to Algo Lab (Algorithm Visualizer).
 
+## [2026-08-26] — v6 Search Lab
+
+### Added
+- **Search Lab** (`search.html`) — third teaching lab for array search
+- Five search algorithms: **Linear**, **Binary**, **Jump**, **Interpolation**, **Exponential**
+- `search-core.js` (`SearchCore`) — pure, non-mutating searches for browser + Node
+- Search UI: value cells, probe / lo / hi / found / eliminated states, teaching mode, linear-vs-binary race
+- Share URL (`?algo=&n=&target=`), run history (`searchLabHistory`)
+- **Sort Lab:** Comb, Gnome, Odd-Even, and Pancake sorts (14 total)
+- `sorting-core.js` (`SortCore`) — pure sorts used by silent tournaments and tests
+- **Path Lab:** Weighted A* (heuristic weight 1.5) and IDA* (iterative deepening, 20k expansion cap)
+- Kruskal maze generator (randomized union-find on even/even cells)
+- Node tests: `tests/sorting.test.js`, `tests/search.test.js`, plus Path Lab coverage for the new searches and Kruskal
+- GitHub Actions CI (`node --test tests/*.test.js` on Node 20) and GitHub Pages deploy
+
+### Changed
+- Lab switcher is Sort Lab · Path Lab · Search Lab on every page
+- Sort tournament runs all 14 algorithms (uses `SortCore` when available)
+- Path tournament runs all 8 algorithms
+- PWA name/description updated; service worker cache bumped to `algo-lab-v6`
+- README documents 14 sorts, 8 path algorithms, Search Lab, tests, and CI
+
 ## [2026-08-20] — v5 Path Lab
 
 ### Added

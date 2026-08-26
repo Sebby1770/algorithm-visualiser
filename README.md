@@ -1,13 +1,16 @@
-# Algo Lab — Sorting & Pathfinding Visualizer
+# Algo Lab — Sorting, Pathfinding & Search Visualizer
+
+**Live lab:** [https://sebby1770.github.io/algorithm-visualiser/](https://sebby1770.github.io/algorithm-visualiser/)
 
 An interactive teaching lab built with pure HTML, CSS, and vanilla JavaScript — no frameworks, no build step, no npm runtime dependencies.
 
-Two labs share the same chrome, theme, and sound toggle:
+Three labs share the same chrome, theme, and sound toggle:
 
-- **Sort Lab** (`index.html`) — 10 sorting algorithms
-- **Path Lab** (`pathfinding.html`) — 6 pathfinding algorithms + maze generators
+- **Sort Lab** (`index.html`) — 14 sorting algorithms
+- **Path Lab** (`pathfinding.html`) — 8 pathfinding algorithms + maze generators
+- **Search Lab** (`search.html`) — 5 searching algorithms
 
-![Algorithms](https://img.shields.io/badge/sort-10-blue) ![Pathfinding](https://img.shields.io/badge/path-6-indigo) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
+![Sort](https://img.shields.io/badge/sort-14-blue) ![Pathfinding](https://img.shields.io/badge/path-8-indigo) ![Search](https://img.shields.io/badge/search-5-teal) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
 
 ## Running
 
@@ -15,8 +18,9 @@ No build tools. Open the files in a modern browser, or serve locally (recommende
 
 ```bash
 python3 -m http.server
-# → http://localhost:8000          Sort Lab
+# → http://localhost:8000                 Sort Lab
 # → http://localhost:8000/pathfinding.html   Path Lab
+# → http://localhost:8000/search.html        Search Lab
 ```
 
 macOS: `open index.html` · Linux: `xdg-open index.html`
@@ -25,15 +29,17 @@ macOS: `open index.html` · Linux: `xdg-open index.html`
 
 ## Tests
 
-Pathfinding algorithms and maze generators are covered by Node’s built-in test runner (no packages to install):
+Sorting, pathfinding, and search cores are covered by Node’s built-in test runner (no packages to install):
 
 ```bash
-node --test tests/pathfinding.test.js
+node --test tests/pathfinding.test.js tests/sorting.test.js tests/search.test.js
 ```
+
+CI runs the same command on Node 20 via GitHub Actions (`.github/workflows/ci.yml`). Static files deploy to GitHub Pages (`.github/workflows/pages.yml`).
 
 ## Sort Lab
 
-### Algorithms (10)
+### Algorithms (14)
 
 | Algorithm | Best | Average | Worst | Stable | In-place | Memory |
 |-----------|------|---------|-------|--------|----------|--------|
@@ -47,6 +53,14 @@ node --test tests/pathfinding.test.js
 | Radix | O(nk) | O(nk) | O(nk) | Yes | No | O(n + k) |
 | Counting | O(n + k) | O(n + k) | O(n + k) | Yes | No | O(k) |
 | Cocktail Shaker | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
+| Comb | O(n log n) | O(n² / 2ᵖ) | O(n²) | No | Yes | O(1) |
+| Gnome | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
+| Odd-Even | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
+| Pancake | O(n) | O(n²) | O(n²) | No | Yes | O(1) |
+
+Radix is LSD base 10 (non-negative integers). Comb uses a 1.3 shrink factor. Pancake sorts by prefix reversals.
+
+Pure implementations live in `sorting-core.js` (`SortCore` in the browser / `module.exports` in Node). Visual runs still use `SortRunner` in `script.js`. Silent tournaments use `SortCore` when it is loaded.
 
 ### Dataset generators
 
@@ -62,7 +76,7 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 - Presentation Mode
 - Access heatmap + operations sparkline
 - Algorithm recommender
-- Benchmark tournament (all 10) with comparison matrix
+- Benchmark tournament (all 14) with comparison matrix
 - Learning cards (trivia + use cases)
 - Run history (last 8, `localStorage` key `sortLabHistory`)
 - Share URL, CSV export, copy summary
@@ -70,7 +84,7 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 
 ## Path Lab
 
-### Algorithms (6)
+### Algorithms (8)
 
 | Algorithm | Time | Weighted | Complete | Optimal | Heuristic |
 |-----------|------|----------|----------|---------|-----------|
@@ -80,8 +94,12 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 | A* | O((V + E) log V) | Yes | Yes | Yes (admissible h) | Manhattan / Euclidean if diagonal |
 | Greedy Best-First | O((V + E) log V) | No | Yes | No | Manhattan / Euclidean if diagonal |
 | Bidirectional BFS | O(V + E) | No | Yes | Unweighted shortest | None |
+| Weighted A* | O((V + E) log V) | Yes | Yes | No (w=1.5) | Manhattan / Euclidean × 1.5 |
+| IDA* | O(b^d) | Yes | Yes | Yes (admissible h) | Manhattan / Euclidean |
 
 Path cost is the sum of cell weights along the path **excluding start, including end**. Empty cells weigh `1`; weight cells weigh `5`. BFS / DFS / bidirectional BFS treat every step as cost 1 when *searching*, but reported path cost still uses actual weights.
+
+Weighted A* scales the heuristic by `opts.weight` (default **1.5**). IDA* raises the f-cost bound by the minimum overflow; expansions are capped at 20 000.
 
 ### Maze generators
 
@@ -93,6 +111,7 @@ Path cost is the sum of cell weights along the path **excluding start, including
 | Recursive Division | Adds walls with one gap per divider |
 | Binary Tree | South/east biased corridors |
 | Scatter Walls | Random walls (start/end stay free) |
+| Kruskal | Randomized Kruskal (union-find on even/even cells) |
 
 Carved mazes prefer even/even passage cells. Even dimensions get a short corridor so the bottom-right corner stays reachable. All maze helpers **return a new grid** and never mutate an input.
 
@@ -109,33 +128,67 @@ Carved mazes prefer even/even passage cells. Even dimensions get a short corrido
 
 Glyphs (not color alone): **S** start, **E** end, **●** weight.
 
+## Search Lab
+
+### Algorithms (5)
+
+| Algorithm | Average | Worst | Needs sorted |
+|-----------|---------|-------|--------------|
+| Linear | O(n) | O(n) | No |
+| Binary | O(log n) | O(log n) | Yes |
+| Jump | O(√n) | O(√n) | Yes |
+| Interpolation | O(log log n) | O(n) | Yes |
+| Exponential | O(log n) | O(log n) | Yes |
+
+Each core routine returns `{ found, index, probes, probeOrder }` and **never mutates** the input. Binary / jump / interpolation / exponential auto-sort the displayed array and show a note.
+
+### Features
+
+- Array as value cells (not bars): current probe, low/high bounds, found, eliminated
+- Random sorted or custom datasets, target value, speed, pause / step / reset
+- Teaching Mode with `aria-live` narration
+- Race: linear vs binary on the same data
+- Metrics: probes, found index, elapsed ms
+- Algorithm profiles + learning cards
+- Share URL: `?algo=&n=&target=`
+- Run history (last 8, `localStorage` key `searchLabHistory`)
+- Keyboard: `Space` pause · `S` start · `G` generate · `R` reset
+
 ## Shared UI
 
-- Lab switcher in the top bar: Sort Lab ↔ Path Lab
+- Lab switcher in the top bar: Sort Lab · Path Lab · Search Lab
 - Dark / light theme — `localStorage` key `theme` (shared)
 - Sound beeps (Web Audio) — `localStorage` key `sound` (shared)
-- PWA manifest + service worker (`algo-lab-v5`) for offline use
+- PWA manifest + service worker (`algo-lab-v6`) for offline use
 - `aria-live` status and teaching narration
 
 ## File structure
 
 ```
 algorithm-visualiser/
-├── index.html              # Sort Lab
-├── pathfinding.html        # Path Lab
-├── style.css               # Shared theme + path grid
-├── script.js               # Sort Lab app
-├── pathfinding.js          # Path Lab UI
-├── pathfinding-core.js     # Search + mazes (browser + Node)
+├── index.html                 # Sort Lab
+├── pathfinding.html           # Path Lab
+├── search.html                # Search Lab
+├── style.css                  # Shared theme + path grid + search cells
+├── script.js                  # Sort Lab app (visual SortRunner)
+├── sorting-core.js            # Pure sorts (browser + Node)
+├── pathfinding.js             # Path Lab UI
+├── pathfinding-core.js        # Search + mazes (browser + Node)
+├── search.js                  # Search Lab UI
+├── search-core.js             # Pure searches (browser + Node)
 ├── tests/pathfinding.test.js
-├── sw.js                   # Service worker
-├── manifest.json           # PWA manifest
+├── tests/sorting.test.js
+├── tests/search.test.js
+├── .github/workflows/ci.yml
+├── .github/workflows/pages.yml
+├── sw.js                      # Service worker
+├── manifest.json              # PWA manifest
 ├── CHANGELOG.md
-├── LICENSE                 # MIT
+├── LICENSE                    # MIT
 └── README.md
 ```
 
-`pathfinding-core.js` exports `PathCore` in the browser and `module.exports` in Node.
+`sorting-core.js` exports `SortCore`, `pathfinding-core.js` exports `PathCore`, and `search-core.js` exports `SearchCore` in the browser (`module.exports` in Node).
 
 ## License
 

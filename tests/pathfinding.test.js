@@ -202,7 +202,16 @@ test("Unreachable end returns found=false and path=[]", () => {
     "..#.",
     "..#.",
   ]);
-  for (const name of ["bfs", "dfs", "dijkstra", "astar", "greedy", "bidirectionalBfs"]) {
+  for (const name of [
+    "bfs",
+    "dfs",
+    "dijkstra",
+    "astar",
+    "greedy",
+    "bidirectionalBfs",
+    "weightedAstar",
+    "idaStar",
+  ]) {
     const result = PathCore[name](grid, start, end);
     assert.equal(result.found, false, name);
     assert.deepEqual(result.path, [], name);
@@ -223,6 +232,8 @@ test("Search algorithms do not mutate the original grid", () => {
   PathCore.astar(grid, start, end);
   PathCore.greedy(grid, start, end);
   PathCore.bidirectionalBfs(grid, start, end);
+  PathCore.weightedAstar(grid, start, end);
+  PathCore.idaStar(grid, start, end);
   PathCore.astar(grid, start, end, { diagonal: true });
   assert.equal(snapshot(grid), before);
 });
@@ -335,6 +346,71 @@ test("scatterWalls: start/end free, some walls, dimensions match", () => {
   assert.equal(start.c, 0);
   assert.equal(end.r, 11);
   assert.equal(end.c, 17);
+});
+
+function openGrid(rows, cols) {
+  const grid = PathCore.makeGrid(rows, cols);
+  const start = { r: 0, c: 0 };
+  const end = { r: rows - 1, c: cols - 1 };
+  grid[start.r][start.c].type = "start";
+  grid[end.r][end.c].type = "end";
+  return { grid, start, end };
+}
+
+test("weightedAstar finds a path on an open grid", () => {
+  const { grid, start, end } = openGrid(8, 10);
+  const before = snapshot(grid);
+  const result = PathCore.weightedAstar(grid, start, end);
+  assertValidPath(grid, result, start, end, false);
+  assert.equal(result.algorithm, "weightedAstar");
+  assert.ok(result.pathCost > 0);
+  const viaSearch = PathCore.search("weightedAstar", grid, start, end);
+  assert.equal(viaSearch.found, true);
+  assert.equal(snapshot(grid), before);
+});
+
+test("idaStar finds a path on an open grid", () => {
+  const { grid, start, end } = openGrid(8, 10);
+  const before = snapshot(grid);
+  const result = PathCore.idaStar(grid, start, end);
+  assertValidPath(grid, result, start, end, false);
+  assert.equal(result.algorithm, "idaStar");
+  assert.ok(result.pathCost > 0);
+  assert.equal(snapshot(grid), before);
+});
+
+test("mazeKruskal: start/end walkable and BFS can reach end", () => {
+  const grid = PathCore.mazeKruskal(15, 21, rngFrom(42));
+  assertMazeShape(grid, 15, 21);
+  const start = PathCore.findCell(grid, "start");
+  const end = PathCore.findCell(grid, "end");
+  assert.notEqual(grid[start.r][start.c].type, "wall");
+  assert.notEqual(grid[end.r][end.c].type, "wall");
+  const result = PathCore.bfs(grid, start, end);
+  assertValidPath(grid, result, start, end, false);
+});
+
+test("mazeKruskal works on even dimensions", () => {
+  const grid = PathCore.mazeKruskal(10, 12, rngFrom(7));
+  assertMazeShape(grid, 10, 12);
+  const start = PathCore.findCell(grid, "start");
+  const end = PathCore.findCell(grid, "end");
+  const result = PathCore.bfs(grid, start, end);
+  assert.equal(result.found, true, "even-size Kruskal maze should be solvable");
+  assertValidPath(grid, result, start, end, false);
+});
+
+test("maze generators do not mutate a source grid", () => {
+  const source = PathCore.makeGrid(11, 13);
+  PathCore.setCell(source, 3, 4, { type: "wall" });
+  const before = snapshot(source);
+  PathCore.mazeRecursiveBacktracker(11, 13, rngFrom(1));
+  PathCore.mazePrim(11, 13, rngFrom(2));
+  PathCore.mazeRecursiveDivision(11, 13, rngFrom(3));
+  PathCore.mazeBinaryTree(11, 13, rngFrom(4));
+  PathCore.mazeKruskal(11, 13, rngFrom(5));
+  PathCore.scatterWalls(11, 13, 0.3, rngFrom(6));
+  assert.equal(snapshot(source), before);
 });
 
 test("reconstructPath follows a parent map", () => {

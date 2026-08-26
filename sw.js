@@ -1,13 +1,17 @@
-/* Algo Lab — Service Worker v5 */
-const CACHE_NAME = "algo-lab-v5";
+/* Algo Lab — Service Worker v6 */
+const CACHE_NAME = "algo-lab-v6";
 const ASSETS = [
   "./",
   "./index.html",
   "./pathfinding.html",
+  "./search.html",
   "./style.css",
   "./script.js",
+  "./sorting-core.js",
   "./pathfinding.js",
   "./pathfinding-core.js",
+  "./search.js",
+  "./search-core.js",
   "./manifest.json",
 ];
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Interactive pathfinding visualizer with BFS, DFS, Dijkstra, A*, greedy best-first, bidirectional BFS, maze generators, and race mode." />
+  <meta name="description" content="Interactive pathfinding visualizer with BFS, DFS, Dijkstra, A*, weighted A*, IDA*, greedy best-first, bidirectional BFS, maze generators, and race mode." />
   <meta name="theme-color" content="#0b1220" />
   <title>Algo Lab — Pathfinding Visualizer</title>
   <link rel="manifest" href="manifest.json" />
@@ -23,6 +23,7 @@
         <nav class="lab-switcher" aria-label="Choose a lab">
           <a class="lab-pill" href="index.html">Sort Lab</a>
           <a class="lab-pill is-active" href="pathfinding.html" aria-current="page">Path Lab</a>
+          <a class="lab-pill" href="search.html">Search Lab</a>
         </nav>
       </div>
       <div class="topbar-actions">
@@ -49,6 +50,8 @@
               <option value="astar" selected>A*</option>
               <option value="greedy">Greedy Best-First</option>
               <option value="bidirectionalBfs">Bidirectional BFS</option>
+              <option value="weightedAstar">Weighted A*</option>
+              <option value="idaStar">IDA*</option>
             </select>
           </div>
 
@@ -64,6 +67,8 @@
               <option value="astar">A*</option>
               <option value="greedy">Greedy Best-First</option>
               <option value="bidirectionalBfs">Bidirectional BFS</option>
+              <option value="weightedAstar">Weighted A*</option>
+              <option value="idaStar">IDA*</option>
             </select>
           </div>
 
@@ -76,6 +81,7 @@
               <option value="division">Recursive Division</option>
               <option value="binary">Binary Tree</option>
               <option value="scatter">Scatter Walls</option>
+              <option value="kruskal">Kruskal</option>
             </select>
           </div>
 
@@ -143,7 +149,7 @@
             <button id="resetBtn" class="btn btn-secondary" title="Shortcut: R">Reset Board</button>
           </div>
 
-          <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 6 algorithms on the current board">🏆 Algorithm Tournament</button>
+          <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 8 algorithms on the current board">🏆 Algorithm Tournament</button>
 
           <p class="shortcut-hint">Space pause · S start · G maze · R reset · C clear · Esc stop · 1 wall · 2 weight · 3 erase</p>
         </section>

@@ -417,6 +417,56 @@
     return finish("astar", grid, false, [], visitedOrder, frontierPeak);
   }
 
+  function weightedAstar(grid, start, end, opts) {
+    if (!grid || !grid.length) return invalid("weightedAstar");
+    start = coord(start);
+    end = coord(end);
+    if (!inBounds(grid, start) || !inBounds(grid, end)) return invalid("weightedAstar");
+    if (sameCell(start, end)) return trivial("weightedAstar", start);
+
+    const o = searchOpts(start, end, opts);
+    const weight = o.weight != null && typeof o.weight === "number" && o.weight > 0 ? o.weight : 1.5;
+    const heap = createMinHeap();
+    const gScore = new Map();
+    const cameFrom = new Map();
+    const closed = new Set();
+    const visitedOrder = [];
+    const startKey = key(start);
+    gScore.set(startKey, 0);
+    const h0 = heuristic(start, end, o);
+    heap.push({ r: start.r, c: start.c, pri: weight * h0, tie: h0, g: 0 });
+    let frontierPeak = 1;
+
+    while (heap.size) {
+      if (heap.size > frontierPeak) frontierPeak = heap.size;
+      const cur = heap.pop();
+      const id = key(cur);
+      if (closed.has(id)) continue;
+      const bestG = gScore.get(id);
+      if (bestG !== undefined && cur.g > bestG) continue;
+      closed.add(id);
+      visitedOrder.push({ r: cur.r, c: cur.c });
+      if (sameCell(cur, end)) {
+        return finish("weightedAstar", grid, true, reconstructPath(cameFrom, end, start), visitedOrder, frontierPeak);
+      }
+      const nbrs = neighbors(grid, cur.r, cur.c, o);
+      for (let i = 0; i < nbrs.length; i++) {
+        const n = nbrs[i];
+        const nid = key(n);
+        if (closed.has(nid)) continue;
+        const ng = cur.g + cellWeight(grid[n.r][n.c]);
+        const prev = gScore.get(nid);
+        if (prev === undefined || ng < prev) {
+          gScore.set(nid, ng);
+          cameFrom.set(nid, { r: cur.r, c: cur.c });
+          const h = heuristic(n, end, o);
+          heap.push({ r: n.r, c: n.c, pri: ng + weight * h, tie: h, g: ng });
+        }
+      }
+    }
+    return finish("weightedAstar", grid, false, [], visitedOrder, frontierPeak);
+  }
+
   function greedy(grid, start, end, opts) {
     if (!grid || !grid.length) return invalid("greedy");
     start = coord(start);
@@ -525,6 +575,85 @@
     return finish("bidirectionalBfs", grid, false, [], visitedOrder, frontierPeak);
   }
 
+  const IDA_MAX_EXPANSIONS = 20000;
+
+  function idaStar(grid, start, end, opts) {
+    if (!grid || !grid.length) return invalid("idaStar");
+    start = coord(start);
+    end = coord(end);
+    if (!inBounds(grid, start) || !inBounds(grid, end)) return invalid("idaStar");
+    if (sameCell(start, end)) return trivial("idaStar", start);
+
+    const o = searchOpts(start, end, opts);
+    const visitedOrder = [];
+    let expansions = 0;
+    let frontierPeak = 1;
+
+    function searchBound(bound) {
+      const stack = [{ r: start.r, c: start.c, g: 0, nbrIndex: -1, nbrs: null }];
+      const pathSet = new Set([key(start)]);
+      const cameFrom = new Map();
+      let minOverflow = Infinity;
+
+      while (stack.length) {
+        if (stack.length > frontierPeak) frontierPeak = stack.length;
+        const frame = stack[stack.length - 1];
+        const id = key(frame);
+
+        if (frame.nbrIndex < 0) {
+          expansions++;
+          if (expansions > IDA_MAX_EXPANSIONS) return { status: "cap" };
+          visitedOrder.push({ r: frame.r, c: frame.c });
+          const f = frame.g + heuristic(frame, end, o);
+          if (f > bound) {
+            if (f < minOverflow) minOverflow = f;
+            stack.pop();
+            pathSet.delete(id);
+            continue;
+          }
+          if (sameCell(frame, end)) return { status: "found", cameFrom };
+          frame.nbrs = neighbors(grid, frame.r, frame.c, o);
+          frame.nbrIndex = 0;
+        }
+
+        if (frame.nbrIndex >= frame.nbrs.length) {
+          stack.pop();
+          pathSet.delete(id);
+          continue;
+        }
+
+        const n = frame.nbrs[frame.nbrIndex++];
+        const nid = key(n);
+        if (pathSet.has(nid)) continue;
+        pathSet.add(nid);
+        cameFrom.set(nid, { r: frame.r, c: frame.c });
+        stack.push({
+          r: n.r,
+          c: n.c,
+          g: frame.g + cellWeight(grid[n.r][n.c]),
+          nbrIndex: -1,
+          nbrs: null,
+        });
+      }
+
+      if (minOverflow === Infinity) return { status: "fail" };
+      return { status: "overflow", bound: minOverflow };
+    }
+
+    let bound = heuristic(start, end, o);
+    while (expansions <= IDA_MAX_EXPANSIONS) {
+      const res = searchBound(bound);
+      if (res.status === "found") {
+        return finish("idaStar", grid, true, reconstructPath(res.cameFrom, end, start), visitedOrder, frontierPeak);
+      }
+      if (res.status === "fail" || res.status === "cap") {
+        return finish("idaStar", grid, false, [], visitedOrder, frontierPeak);
+      }
+      bound = res.bound;
+    }
+    return finish("idaStar", grid, false, [], visitedOrder, frontierPeak);
+  }
+
   const SEARCH = {
     bfs,
     dfs,
@@ -532,6 +661,8 @@
     astar,
     greedy,
     bidirectionalBfs,
+    weightedAstar,
+    idaStar,
   };
 
   function search(algorithm, grid, start, end, opts) {
@@ -733,6 +864,71 @@
   }
 
   /**
+   * Randomized Kruskal maze. Union-find on even/even cells; knock walls
+   * between disjoint components. Returns a NEW grid. Even dimensions get
+   * the same corner corridor as the other carved mazes.
+   */
+  function mazeKruskal(rows, cols, rng) {
+    rng = rngFn(rng);
+    const grid = makeWallGrid(rows, cols);
+    const parent = [];
+    const rank = [];
+
+    function idx(r, c) {
+      return r * cols + c;
+    }
+
+    function find(x) {
+      while (parent[x] !== x) {
+        parent[x] = parent[parent[x]];
+        x = parent[x];
+      }
+      return x;
+    }
+
+    function union(a, b) {
+      a = find(a);
+      b = find(b);
+      if (a === b) return false;
+      if (rank[a] < rank[b]) parent[a] = b;
+      else if (rank[a] > rank[b]) parent[b] = a;
+      else {
+        parent[b] = a;
+        rank[a]++;
+      }
+      return true;
+    }
+
+    const edges = [];
+    for (let r = 0; r < rows; r += 2) {
+      for (let c = 0; c < cols; c += 2) {
+        grid[r][c].type = "empty";
+        const id = idx(r, c);
+        parent[id] = id;
+        rank[id] = 0;
+        if (c + 2 < cols) edges.push([r, c, r, c + 2, r, c + 1]);
+        if (r + 2 < rows) edges.push([r, c, r + 2, c, r + 1, c]);
+      }
+    }
+
+    for (let i = edges.length - 1; i > 0; i--) {
+      const j = randInt(rng, i + 1);
+      const t = edges[i];
+      edges[i] = edges[j];
+      edges[j] = t;
+    }
+
+    for (let i = 0; i < edges.length; i++) {
+      const e = edges[i];
+      if (union(idx(e[0], e[1]), idx(e[2], e[3]))) {
+        grid[e[4]][e[5]].type = "empty";
+      }
+    }
+
+    return stampStartEnd(grid, true);
+  }
+
+  /**
    * Random walls. Returns a NEW grid. Start/end stay free.
    * density is the probability each other cell becomes a wall (default 0.3).
    */
@@ -782,11 +978,14 @@
     astar,
     greedy,
     bidirectionalBfs,
+    weightedAstar,
+    idaStar,
     search,
     mazeRecursiveBacktracker,
     mazePrim,
     mazeRecursiveDivision,
     mazeBinaryTree,
+    mazeKruskal,
     scatterWalls,
   };
 

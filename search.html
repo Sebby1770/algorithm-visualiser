@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Algo Lab — Search Lab with linear, binary, jump, interpolation, and exponential search, teaching mode, and race." />
+  <meta name="theme-color" content="#0b1220" />
+  <title>Algo Lab — Search Visualizer</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-start">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">⚗</span>
+          <div>
+            <h1>Algo Lab</h1>
+            <p class="brand-sub">Search Algorithm Visualizer</p>
+          </div>
+        </div>
+        <nav class="lab-switcher" aria-label="Choose a lab">
+          <a class="lab-pill" href="index.html">Sort Lab</a>
+          <a class="lab-pill" href="pathfinding.html">Path Lab</a>
+          <a class="lab-pill is-active" href="search.html" aria-current="page">Search Lab</a>
+        </nav>
+      </div>
+      <div class="topbar-actions">
+        <button id="shareUrlBtn" class="btn btn-ghost btn-sm" type="button" title="Copy shareable URL">🔗 Share</button>
+        <label class="toggle-pill" title="Sound effects on probe">
+          <input type="checkbox" id="soundToggle" aria-label="Toggle sound" />
+          <span>🔊 Sound</span>
+        </label>
+        <button id="themeToggle" class="icon-btn" aria-label="Toggle dark mode">🌙</button>
+      </div>
+    </header>
+
+    <div class="workspace">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2 class="panel-title">Controls</h2>
+
+          <div class="field">
+            <label for="algorithm">Algorithm</label>
+            <select id="algorithm">
+              <option value="linear">Linear Search</option>
+              <option value="binary" selected>Binary Search</option>
+              <option value="jump">Jump Search</option>
+              <option value="interpolation">Interpolation Search</option>
+              <option value="exponential">Exponential Search</option>
+            </select>
+          </div>
+
+          <div class="field race-field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="raceMode" />
+              <span>Race linear vs binary</span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label for="dataset">Dataset</label>
+            <select id="dataset">
+              <option value="random-sorted">Random Sorted</option>
+              <option value="custom">Custom Input</option>
+            </select>
+          </div>
+
+          <div class="field" id="customArrayField" hidden>
+            <label for="customArray">Custom Array</label>
+            <textarea id="customArray" rows="3" placeholder="Comma-separated: 5,3,8,1,9&#10;or JSON: [5,3,8,1,9]"></textarea>
+            <button id="applyCustomBtn" type="button" class="btn btn-secondary btn-sm">Apply Custom Array</button>
+            <p id="customArrayError" class="field-error" role="alert" hidden></p>
+          </div>
+
+          <div class="field">
+            <label for="size">Array Size: <span id="sizeValue">16</span></label>
+            <input type="range" id="size" min="5" max="40" value="16" />
+          </div>
+
+          <div class="field">
+            <label for="target">Target value</label>
+            <input type="number" id="target" value="42" />
+          </div>
+
+          <div class="field">
+            <label for="speed">Speed: <span id="speedValue">50</span></label>
+            <input type="range" id="speed" min="1" max="100" value="50" />
+          </div>
+
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="stepMode" />
+              <span>Step Mode (manual advance)</span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="teachingMode" />
+              <span>Teaching Mode (narrated steps)</span>
+            </label>
+          </div>
+
+          <div class="btn-grid">
+            <button id="generateBtn" class="btn btn-secondary" title="Shortcut: G">Generate</button>
+            <button id="startBtn" class="btn btn-primary" title="Shortcut: S">Start</button>
+            <button id="pauseBtn" class="btn btn-secondary" disabled title="Shortcut: Space">Pause</button>
+            <button id="stopBtn" class="btn btn-danger" disabled>Stop</button>
+            <button id="nextStepBtn" class="btn btn-accent" disabled>Next Step</button>
+            <button id="resetBtn" class="btn btn-secondary" title="Shortcut: R">Reset</button>
+          </div>
+
+          <p class="shortcut-hint">Space pause · S start · G generate · R reset</p>
+        </section>
+
+        <section class="panel" id="profilePanel" aria-live="polite"></section>
+
+        <section class="panel" id="learningCardsPanel">
+          <h2 class="panel-title">Learning Cards</h2>
+          <p class="panel-sub">Tap to flip — trivia &amp; real-world use cases</p>
+          <div id="learningCard" class="learning-card" tabindex="0" role="button" aria-label="Flip learning card">
+            <div class="learning-card-inner">
+              <div class="learning-card-front">
+                <span class="learning-card-label">Did you know?</span>
+                <p id="learningTrivia" class="learning-card-text"></p>
+              </div>
+              <div class="learning-card-back">
+                <span class="learning-card-label">Use case</span>
+                <p id="learningUseCase" class="learning-card-text"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">Run History</h2>
+          <ul id="historyList" class="history-list"></ul>
+        </section>
+      </aside>
+
+      <main class="main-stage">
+        <p id="statusText" class="status-bar" aria-live="polite" role="status">Ready</p>
+        <p id="sortedNote" class="search-note" hidden>This algorithm needs a sorted array. The current dataset was sorted automatically.</p>
+
+        <section id="teachingPanel" class="teaching-panel hidden" aria-labelledby="teachingTitle">
+          <h3 id="teachingTitle" class="teaching-title">Teaching Mode</h3>
+          <p id="teachingText" class="teaching-text" aria-live="assertive" aria-atomic="true">Enable Teaching Mode to see step-by-step explanations.</p>
+        </section>
+
+        <div class="viz-grid" id="vizGrid">
+          <section class="viz-pane" id="panePrimary">
+            <div class="pane-header">
+              <h3 id="panePrimaryLabel">Primary</h3>
+              <div id="metricsPrimary" class="metrics-strip"></div>
+            </div>
+            <div id="searchGrid" class="search-grid" role="list" aria-label="Search array"></div>
+          </section>
+
+          <section class="viz-pane hidden" id="paneSecondary">
+            <div class="pane-header">
+              <h3 id="paneSecondaryLabel">Binary Search</h3>
+              <div id="metricsSecondary" class="metrics-strip"></div>
+            </div>
+            <div id="searchGridRace" class="search-grid" role="list" aria-label="Search array race pane"></div>
+          </section>
+        </div>
+
+        <section class="legend" id="legend">
+          <div class="legend-item"><span class="swatch search-default"></span> Unexamined</div>
+          <div class="legend-item"><span class="swatch search-probe"></span> Current probe</div>
+          <div class="legend-item"><span class="swatch search-lo"></span> Low bound</div>
+          <div class="legend-item"><span class="swatch search-hi"></span> High bound</div>
+          <div class="legend-item"><span class="swatch search-found"></span> Found</div>
+          <div class="legend-item"><span class="swatch search-elim"></span> Eliminated</div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="a11yAnnouncer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+  <script src="search-core.js"></script>
+  <script src="search.js"></script>
+</body>
+</html>

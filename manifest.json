@@ -1,7 +1,7 @@
 {
-  "name": "Algo Lab — Sorting & Pathfinding",
+  "name": "Algo Lab — Sorting, Pathfinding & Search",
   "short_name": "Algo Lab",
-  "description": "Interactive algorithm lab with 10 sorting algorithms and 6 pathfinding algorithms, teaching mode, tournaments, and offline support.",
+  "description": "Interactive algorithm lab with 14 sorting algorithms, 8 pathfinding algorithms, Search Lab, teaching mode, tournaments, and offline support.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1220",
