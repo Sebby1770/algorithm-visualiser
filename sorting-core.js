@@ -20,6 +20,8 @@
     "gnome",
     "oddeven",
     "pancake",
+    "cycle",
+    "timsort",
   ];
 
   function stats() {
@@ -431,6 +433,180 @@
     return finish(array, s);
   }
 
+  /**
+   * Cycle sort — rotate each cycle into place. ~O(n) writes, O(n²) compares.
+   */
+  function cycle(input) {
+    const array = input.slice();
+    const s = stats();
+    const n = array.length;
+
+    for (let cycleStart = 0; cycleStart < n - 1; cycleStart++) {
+      let item = array[cycleStart];
+      let pos = cycleStart;
+      for (let i = cycleStart + 1; i < n; i++) {
+        s.comparisons++;
+        if (array[i] < item) pos++;
+      }
+      if (pos === cycleStart) continue;
+      while (pos < n && item === array[pos]) pos++;
+      if (pos >= n) continue;
+      {
+        const displaced = array[pos];
+        array[pos] = item;
+        s.writes++;
+        item = displaced;
+      }
+      while (pos !== cycleStart) {
+        pos = cycleStart;
+        for (let i = cycleStart + 1; i < n; i++) {
+          s.comparisons++;
+          if (array[i] < item) pos++;
+        }
+        while (pos < n && item === array[pos]) pos++;
+        if (pos >= n) break;
+        const displaced = array[pos];
+        array[pos] = item;
+        s.writes++;
+        item = displaced;
+      }
+    }
+    return finish(array, s);
+  }
+
+  function computeMinrun(n) {
+    if (n < 2) return n;
+    // Teaching-scale arrays: cap at 16 so natural runs still merge.
+    // For n >= 64, follow CPython (range 32..64 so n/minrun is near a power of 2).
+    if (n < 64) return Math.min(16, n);
+    let r = 0;
+    while (n >= 64) {
+      r |= n & 1;
+      n >>= 1;
+    }
+    return n + r;
+  }
+
+  function reverseRange(array, lo, hi, s) {
+    while (lo < hi) {
+      swapAt(array, lo, hi, s);
+      lo++;
+      hi--;
+    }
+  }
+
+  function insertionSortRange(array, lo, hi, s) {
+    for (let i = lo + 1; i <= hi; i++) {
+      let j = i;
+      while (j > lo) {
+        s.comparisons++;
+        if (array[j - 1] > array[j]) {
+          swapAt(array, j - 1, j, s);
+          j--;
+        } else {
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Simplified Timsort: natural runs (reverse descending so all ascend),
+   * insertion-sort extend to minrun, then pairwise merge.
+   */
+  function timsort(input) {
+    const array = input.slice();
+    const s = stats();
+    const n = array.length;
+    if (n < 2) return finish(array, s);
+
+    const minrun = computeMinrun(n);
+    const aux = array.slice();
+
+    function merge(low, mid, high) {
+      for (let k = low; k <= high; k++) aux[k] = array[k];
+      let i = low;
+      let j = mid + 1;
+      let k = low;
+      while (i <= mid && j <= high) {
+        s.comparisons++;
+        if (aux[i] <= aux[j]) {
+          array[k] = aux[i];
+          i++;
+        } else {
+          array[k] = aux[j];
+          j++;
+        }
+        s.writes++;
+        k++;
+      }
+      while (i <= mid) {
+        array[k] = aux[i];
+        s.writes++;
+        i++;
+        k++;
+      }
+      while (j <= high) {
+        array[k] = aux[j];
+        s.writes++;
+        j++;
+        k++;
+      }
+    }
+
+    function countRunAndMakeAscending(lo) {
+      if (lo + 1 >= n) return 1;
+      let hi = lo + 1;
+      s.comparisons++;
+      if (array[lo] > array[hi]) {
+        while (hi + 1 < n) {
+          s.comparisons++;
+          if (array[hi] > array[hi + 1]) hi++;
+          else break;
+        }
+        reverseRange(array, lo, hi, s);
+      } else {
+        while (hi + 1 < n) {
+          s.comparisons++;
+          if (array[hi] < array[hi + 1]) hi++;
+          else break;
+        }
+      }
+      return hi - lo + 1;
+    }
+
+    const runs = [];
+    let i = 0;
+    while (i < n) {
+      let runLen = countRunAndMakeAscending(i);
+      if (runLen < minrun) {
+        const extendTo = Math.min(i + minrun, n) - 1;
+        insertionSortRange(array, i, extendTo, s);
+        runLen = extendTo - i + 1;
+      }
+      runs.push({ lo: i, hi: i + runLen - 1 });
+      i += runLen;
+    }
+
+    while (runs.length > 1) {
+      const next = [];
+      for (let r = 0; r < runs.length; r += 2) {
+        if (r + 1 < runs.length) {
+          const a = runs[r];
+          const b = runs[r + 1];
+          merge(a.lo, a.hi, b.hi);
+          next.push({ lo: a.lo, hi: b.hi });
+        } else {
+          next.push(runs[r]);
+        }
+      }
+      runs.length = 0;
+      for (let r = 0; r < next.length; r++) runs.push(next[r]);
+    }
+
+    return finish(array, s);
+  }
+
   const ALGORITHMS = {
     bubble,
     selection,
@@ -446,6 +622,8 @@
     gnome,
     oddeven,
     pancake,
+    cycle,
+    timsort,
   };
 
   function sort(id, arr) {
@@ -528,6 +706,8 @@
     gnome,
     oddeven,
     pancake,
+    cycle,
+    timsort,
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = api;

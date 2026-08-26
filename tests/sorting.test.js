@@ -22,8 +22,8 @@ function assertSortedCopy(id, input) {
   assert.equal(typeof result.writes, "number");
 }
 
-test("ALGORITHM_IDS lists 14 algorithms", () => {
-  assert.equal(SortCore.ALGORITHM_IDS.length, 14);
+test("ALGORITHM_IDS lists 16 algorithms", () => {
+  assert.equal(SortCore.ALGORITHM_IDS.length, 16);
   for (const id of [
     "bubble",
     "selection",
@@ -39,6 +39,8 @@ test("ALGORITHM_IDS lists 14 algorithms", () => {
     "gnome",
     "oddeven",
     "pancake",
+    "cycle",
+    "timsort",
   ]) {
     assert.ok(SortCore.ALGORITHM_IDS.includes(id), id);
   }
@@ -86,6 +88,14 @@ test("counting and radix sort non-negative integers from the UI range", () => {
   for (const id of ["counting", "radix"]) {
     assertSortedCopy(id, input);
   }
+});
+
+test("cycle sort write count on reversed unique keys is at most n", () => {
+  const input = [8, 7, 6, 5, 4, 3, 2, 1];
+  const result = SortCore.sort("cycle", input);
+  assert.equal(SortCore.isSorted(result.array), true);
+  sameMultiset(result.array, input);
+  assert.ok(result.writes <= input.length, "cycle writes=" + result.writes);
 });
 
 test("bubble and cocktail early-exit on a sorted array", () => {

@@ -1,11 +1,11 @@
 /* ============================================================
-   Sorting Algorithm Lab v6
+   Sorting Algorithm Lab v7
    Vanilla JS — no frameworks
    ============================================================ */
 
 const ALGORITHM_IDS = [
   "bubble", "selection", "insertion", "merge", "quick", "heap", "shell", "radix",
-  "counting", "cocktail", "comb", "gnome", "oddeven", "pancake",
+  "counting", "cocktail", "comb", "gnome", "oddeven", "pancake", "cycle", "timsort",
 ];
 
 // ---------- Algorithm metadata ----------
@@ -150,6 +150,26 @@ const ALGORITHM_PROFILES = {
     memory: "O(1)",
     description: "Sorts by prefix reversals: flip the max to the front, then into place.",
   },
+  cycle: {
+    name: "Cycle Sort",
+    best: "O(n²)",
+    avg: "O(n²)",
+    worst: "O(n²)",
+    stable: false,
+    inPlace: true,
+    memory: "O(1)",
+    description: "Rotates each cycle into place so each element is written at most once — minimal writes.",
+  },
+  timsort: {
+    name: "Timsort",
+    best: "O(n)",
+    avg: "O(n log n)",
+    worst: "O(n log n)",
+    stable: true,
+    inPlace: false,
+    memory: "O(n)",
+    description: "Natural mergesort of runs: reverse descending runs, insertion-sort to minrun, then merge.",
+  },
 };
 
 const LEARNING_CARDS = {
@@ -208,6 +228,14 @@ const LEARNING_CARDS = {
   pancake: {
     trivia: "Pancake sorting asks: how many spatula flips to sort a stack? Bill Gates published a bound on it in 1979.",
     useCase: "Rewriting prefixes in genome rearrangement and any “only reverse a prefix” constraint.",
+  },
+  cycle: {
+    trivia: "Cycle sort is theoretically optimal for writes: every item is written at most once, so a reversed unique list needs ≤ n writes.",
+    useCase: "EEPROM / flash where writes wear the medium, and any setting where comparisons are cheap but stores are not.",
+  },
+  timsort: {
+    trivia: "Timsort (Tim Peters, 2002) is Python’s default sort and Java’s for objects — it gallops over already-sorted runs.",
+    useCase: "Real-world arrays that are often partially sorted: logs, user-generated lists, and stable object sorts.",
   },
 };
 
@@ -964,6 +992,8 @@ class SortRunner {
       gnome: () => this.gnomeSort(),
       oddeven: () => this.oddEvenSort(),
       pancake: () => this.pancakeSort(),
+      cycle: () => this.cycleSort(),
+      timsort: () => this.timsort(),
     };
 
     try {
@@ -1480,6 +1510,162 @@ class SortRunner {
       this.markSorted(curr - 1);
     }
     if (n > 0) this.markSorted(0);
+  }
+
+  async cycleSort() {
+    const n = this.array.length;
+    this.narrate("Cycle sort: rotate each cycle so every value is written into its final index.");
+
+    for (let cycleStart = 0; cycleStart < n - 1; cycleStart++) {
+      let item = this.array[cycleStart];
+      let itemId = this.ids[cycleStart];
+      let pos = cycleStart;
+
+      this.narrate(`Starting a cycle at index ${cycleStart} (item ${item}).`);
+      for (let i = cycleStart + 1; i < n; i++) {
+        await this.compare(cycleStart, i);
+        if (this.array[i] < item) pos++;
+        this.clearCompare(cycleStart, i);
+      }
+
+      if (pos === cycleStart) {
+        this.markSorted(cycleStart);
+        continue;
+      }
+
+      while (pos < n && item === this.array[pos]) pos++;
+      if (pos >= n) continue;
+      {
+        const displaced = this.array[pos];
+        const displacedId = this.ids[pos];
+        await this.write(pos, item, itemId);
+        item = displaced;
+        itemId = displacedId;
+      }
+
+      while (pos !== cycleStart) {
+        pos = cycleStart;
+        for (let i = cycleStart + 1; i < n; i++) {
+          await this.compare(cycleStart, i);
+          if (this.array[i] < item) pos++;
+          this.clearCompare(cycleStart, i);
+        }
+        while (pos < n && item === this.array[pos]) pos++;
+        if (pos >= n) break;
+        const displaced = this.array[pos];
+        const displacedId = this.ids[pos];
+        await this.write(pos, item, itemId);
+        item = displaced;
+        itemId = displacedId;
+      }
+      this.markSorted(cycleStart);
+    }
+    if (n > 0) this.markSorted(n - 1);
+  }
+
+  computeMinrun(n) {
+    if (n < 2) return n;
+    if (n < 64) return Math.min(16, n);
+    let r = 0;
+    while (n >= 64) {
+      r |= n & 1;
+      n >>= 1;
+    }
+    return n + r;
+  }
+
+  async reverseRange(lo, hi) {
+    this.narrate(`Reversing descending run [${lo}…${hi}] so it ascends.`);
+    while (lo < hi) {
+      await this.swap(lo, hi);
+      lo++;
+      hi--;
+    }
+  }
+
+  async insertionSortRange(lo, hi) {
+    this.narrate(`Insertion-sorting run [${lo}…${hi}] up to minrun.`);
+    for (let i = lo + 1; i <= hi; i++) {
+      let j = i;
+      while (j > lo) {
+        await this.compare(j - 1, j);
+        if (this.array[j - 1] > this.array[j]) {
+          await this.swap(j - 1, j);
+          j--;
+        } else {
+          this.clearCompare(j - 1, j);
+          break;
+        }
+        this.clearCompare(j - 1, j);
+      }
+    }
+  }
+
+  async countRunAndMakeAscending(lo, n) {
+    if (lo + 1 >= n) return 1;
+    await this.compare(lo, lo + 1);
+    const descending = this.array[lo] > this.array[lo + 1];
+    this.clearCompare(lo, lo + 1);
+    let hi = lo + 1;
+    if (descending) {
+      while (hi + 1 < n) {
+        await this.compare(hi, hi + 1);
+        const cont = this.array[hi] > this.array[hi + 1];
+        this.clearCompare(hi, hi + 1);
+        if (!cont) break;
+        hi++;
+      }
+      await this.reverseRange(lo, hi);
+    } else {
+      while (hi + 1 < n) {
+        await this.compare(hi, hi + 1);
+        const cont = this.array[hi] < this.array[hi + 1];
+        this.clearCompare(hi, hi + 1);
+        if (!cont) break;
+        hi++;
+      }
+    }
+    return hi - lo + 1;
+  }
+
+  async timsort() {
+    const n = this.array.length;
+    if (n < 2) return;
+    const minrun = this.computeMinrun(n);
+    this.narrate(`Timsort: scanning natural runs (minrun = ${minrun}).`);
+
+    const runs = [];
+    let i = 0;
+    while (i < n) {
+      let runLen = await this.countRunAndMakeAscending(i, n);
+      if (runLen < minrun) {
+        const extendTo = Math.min(i + minrun, n) - 1;
+        await this.insertionSortRange(i, extendTo);
+        runLen = extendTo - i + 1;
+      }
+      runs.push({ lo: i, hi: i + runLen - 1 });
+      this.narrate(`Run [${i}…${i + runLen - 1}] is ready.`);
+      i += runLen;
+    }
+
+    const aux = [...this.array];
+    const auxIds = [...this.ids];
+    while (runs.length > 1) {
+      const next = [];
+      for (let r = 0; r < runs.length; r += 2) {
+        if (r + 1 < runs.length) {
+          const a = runs[r];
+          const b = runs[r + 1];
+          this.narrate(`Merging runs [${a.lo}…${a.hi}] and [${b.lo}…${b.hi}].`);
+          await this.merge(a.lo, a.hi, b.hi, aux, auxIds);
+          next.push({ lo: a.lo, hi: b.hi });
+        } else {
+          next.push(runs[r]);
+        }
+      }
+      runs.length = 0;
+      for (let r = 0; r < next.length; r++) runs.push(next[r]);
+    }
   }
 }
 
@@ -2225,7 +2411,7 @@ class SortLabApp {
     const size = data.length;
     const results = [];
 
-    this.setStatus("Running benchmark tournament on all 14 algorithms…");
+    this.setStatus("Running benchmark tournament on all 16 algorithms…");
     this.announce("Benchmark tournament started.");
 
     const useCore = typeof SortCore !== "undefined";

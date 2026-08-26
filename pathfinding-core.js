@@ -254,6 +254,9 @@
       get size() {
         return a.length;
       },
+      peek() {
+        return a[0];
+      },
       push(item) {
         a.push(item);
         up(a.length - 1);
@@ -605,6 +608,118 @@
     return finish("bidirectionalBfs", grid, false, [], visitedOrder, frontierPeak);
   }
 
+  function bidirectionalDijkstra(grid, start, end, opts) {
+    if (!grid || !grid.length) return invalid("bidirectionalDijkstra");
+    start = coord(start);
+    end = coord(end);
+    if (!inBounds(grid, start) || !inBounds(grid, end)) return invalid("bidirectionalDijkstra");
+    if (sameCell(start, end)) return trivial("bidirectionalDijkstra", start);
+
+    const o = searchOpts(start, end, opts);
+    const heapS = createMinHeap();
+    const heapE = createMinHeap();
+    const distS = new Map();
+    const distE = new Map();
+    const cameS = new Map();
+    const cameE = new Map();
+    const closedS = new Set();
+    const closedE = new Set();
+    const visitedOrder = [];
+    distS.set(key(start), 0);
+    distE.set(key(end), 0);
+    cameS.set(key(start), null);
+    cameE.set(key(end), null);
+    heapS.push({ r: start.r, c: start.c, pri: 0, g: 0 });
+    heapE.push({ r: end.r, c: end.c, pri: 0, g: 0 });
+    let frontierPeak = 2;
+    let mu = Infinity;
+    let meet = null;
+
+    function considerMeet(cell) {
+      const id = key(cell);
+      if (!distS.has(id) || !distE.has(id)) return;
+      const cand = distS.get(id) + distE.get(id);
+      if (cand < mu) {
+        mu = cand;
+        meet = { r: cell.r, c: cell.c };
+      }
+    }
+
+    function joinPath(meetCell) {
+      const left = reconstructPath(cameS, meetCell, start);
+      const right = [];
+      let cur = lookupParent(cameE, key(meetCell));
+      const guard = new Set([key(meetCell)]);
+      while (cur) {
+        const id = key(cur);
+        if (guard.has(id)) break;
+        guard.add(id);
+        right.push({ r: cur.r, c: cur.c });
+        if (sameCell(cur, end)) break;
+        cur = lookupParent(cameE, id);
+      }
+      return left.concat(right);
+    }
+
+    function expand(heap, distThis, cameThis, closedThis, forward) {
+      while (heap.size) {
+        const cur = heap.pop();
+        const id = key(cur);
+        if (closedThis.has(id)) continue;
+        const best = distThis.get(id);
+        if (best !== undefined && cur.g > best) continue;
+        closedThis.add(id);
+        visitedOrder.push({ r: cur.r, c: cur.c });
+        considerMeet(cur);
+
+        const nbrs = neighbors(grid, cur.r, cur.c, o);
+        for (let i = 0; i < nbrs.length; i++) {
+          const n = nbrs[i];
+          const nid = key(n);
+          if (closedThis.has(nid)) continue;
+          const step = forward ? cellWeight(grid[n.r][n.c]) : cellWeight(grid[cur.r][cur.c]);
+          const ng = cur.g + step;
+          const prev = distThis.get(nid);
+          if (prev === undefined || ng < prev) {
+            distThis.set(nid, ng);
+            cameThis.set(nid, { r: cur.r, c: cur.c });
+            heap.push({ r: n.r, c: n.c, pri: ng, g: ng });
+            considerMeet(n);
+          }
+        }
+        return true;
+      }
+      return false;
+    }
+
+    while (heapS.size || heapE.size) {
+      frontierPeak = Math.max(frontierPeak, heapS.size + heapE.size);
+      if (mu < Infinity) {
+        const topS = heapS.peek();
+        const topE = heapE.peek();
+        if (topS && topE && topS.pri + topE.pri >= mu) break;
+        if (topS && !heapE.size && topS.pri >= mu) break;
+        if (topE && !heapS.size && topE.pri >= mu) break;
+      }
+      const preferForward = heapS.size > 0 && (heapE.size === 0 || heapS.size <= heapE.size);
+      if (preferForward) {
+        expand(heapS, distS, cameS, closedS, true);
+      } else {
+        expand(heapE, distE, cameE, closedE, false);
+      }
+    }
+
+    if (meet && mu < Infinity) {
+      const path = joinPath(meet);
+      return finish("bidirectionalDijkstra", grid, true, path, visitedOrder, frontierPeak, {
+        scores: buildScores(distS, end, o),
+      });
+    }
+    return finish("bidirectionalDijkstra", grid, false, [], visitedOrder, frontierPeak, {
+      scores: buildScores(distS, end, o),
+    });
+  }
+
   const IDA_MAX_EXPANSIONS = 20000;
 
   function idaStar(grid, start, end, opts) {
@@ -691,6 +806,7 @@
     astar,
     greedy,
     bidirectionalBfs,
+    bidirectionalDijkstra,
     weightedAstar,
     idaStar,
   };
@@ -712,7 +828,16 @@
     return grid;
   }
 
-  function stampStartEnd(grid, connectEvenCorner) {
+  function openPassage(grid, r, c, carveOrder) {
+    if (!inBounds(grid, r, c)) return;
+    const cell = grid[r][c];
+    if (cell.type !== "wall") return;
+    cell.type = "empty";
+    cell.weight = EMPTY_WEIGHT;
+    if (carveOrder) carveOrder.push({ r: r, c: c });
+  }
+
+  function stampStartEnd(grid, connectEvenCorner, carveOrder) {
     const rows = grid.length;
     const cols = grid[0].length;
     if (connectEvenCorner) {
@@ -720,13 +845,13 @@
       const ec = (cols - 1) % 2 === 0 ? cols - 1 : cols - 2;
       const sr = 0;
       const sc = 0;
-      grid[sr][sc].type = "empty";
+      openPassage(grid, sr, sc, carveOrder);
       if (er >= 0 && ec >= 0) {
         for (let r = Math.max(0, er); r < rows; r++) {
-          grid[r][Math.max(0, ec)].type = "empty";
+          openPassage(grid, r, Math.max(0, ec), carveOrder);
         }
         for (let c = Math.max(0, ec); c < cols; c++) {
-          grid[rows - 1][c].type = "empty";
+          openPassage(grid, rows - 1, c, carveOrder);
         }
       }
     }
@@ -762,7 +887,8 @@
   function mazeRecursiveBacktracker(rows, cols, rng) {
     rng = rngFn(rng);
     const grid = makeWallGrid(rows, cols);
-    grid[0][0].type = "empty";
+    const carveOrder = [];
+    openPassage(grid, 0, 0, carveOrder);
     const stack = [{ r: 0, c: 0 }];
 
     while (stack.length) {
@@ -775,12 +901,14 @@
       const pick = options[randInt(rng, options.length)];
       const wr = cur.r + pick.dr / 2;
       const wc = cur.c + pick.dc / 2;
-      grid[wr][wc].type = "empty";
-      grid[pick.r][pick.c].type = "empty";
+      openPassage(grid, wr, wc, carveOrder);
+      openPassage(grid, pick.r, pick.c, carveOrder);
       stack.push({ r: pick.r, c: pick.c });
     }
 
-    return stampStartEnd(grid, true);
+    stampStartEnd(grid, true, carveOrder);
+    grid.carveOrder = carveOrder;
+    return grid;
   }
 
   /**
@@ -805,7 +933,8 @@
       }
     }
 
-    grid[0][0].type = "empty";
+    const carveOrder = [];
+    openPassage(grid, 0, 0, carveOrder);
     inMaze.add("0,0");
     addFrontier(0, 0);
 
@@ -818,13 +947,15 @@
       const from = carved[randInt(rng, carved.length)];
       const wr = (cell.r + from.r) / 2;
       const wc = (cell.c + from.c) / 2;
-      grid[wr][wc].type = "empty";
-      grid[cell.r][cell.c].type = "empty";
+      openPassage(grid, wr, wc, carveOrder);
+      openPassage(grid, cell.r, cell.c, carveOrder);
       inMaze.add(key(cell));
       addFrontier(cell.r, cell.c);
     }
 
-    return stampStartEnd(grid, true);
+    stampStartEnd(grid, true, carveOrder);
+    grid.carveOrder = carveOrder;
+    return grid;
   }
 
   /**
@@ -874,10 +1005,11 @@
   function mazeBinaryTree(rows, cols, rng) {
     rng = rngFn(rng);
     const grid = makeWallGrid(rows, cols);
+    const carveOrder = [];
 
     for (let r = 0; r < rows; r += 2) {
       for (let c = 0; c < cols; c += 2) {
-        grid[r][c].type = "empty";
+        openPassage(grid, r, c, carveOrder);
         const opts = [];
         if (r + 2 < rows) opts.push([2, 0]);
         if (c + 2 < cols) opts.push([0, 2]);
@@ -885,12 +1017,14 @@
         const pick = opts[randInt(rng, opts.length)];
         const nr = r + pick[0];
         const nc = c + pick[1];
-        grid[r + pick[0] / 2][c + pick[1] / 2].type = "empty";
-        grid[nr][nc].type = "empty";
+        openPassage(grid, r + pick[0] / 2, c + pick[1] / 2, carveOrder);
+        openPassage(grid, nr, nc, carveOrder);
       }
     }
 
-    return stampStartEnd(grid, true);
+    stampStartEnd(grid, true, carveOrder);
+    grid.carveOrder = carveOrder;
+    return grid;
   }
 
   /**
@@ -929,10 +1063,11 @@
       return true;
     }
 
+    const carveOrder = [];
     const edges = [];
     for (let r = 0; r < rows; r += 2) {
       for (let c = 0; c < cols; c += 2) {
-        grid[r][c].type = "empty";
+        openPassage(grid, r, c, carveOrder);
         const id = idx(r, c);
         parent[id] = id;
         rank[id] = 0;
@@ -951,11 +1086,13 @@
     for (let i = 0; i < edges.length; i++) {
       const e = edges[i];
       if (union(idx(e[0], e[1]), idx(e[2], e[3]))) {
-        grid[e[4]][e[5]].type = "empty";
+        openPassage(grid, e[4], e[5], carveOrder);
       }
     }
 
-    return stampStartEnd(grid, true);
+    stampStartEnd(grid, true, carveOrder);
+    grid.carveOrder = carveOrder;
+    return grid;
   }
 
   /**
@@ -1161,6 +1298,7 @@
     astar,
     greedy,
     bidirectionalBfs,
+    bidirectionalDijkstra,
     weightedAstar,
     idaStar,
     search,

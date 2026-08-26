@@ -2,6 +2,20 @@
 
 All notable changes to Algo Lab (Algorithm Visualizer).
 
+## [2026-08-26] — v7 Cycle, Timsort, Ternary, Fibonacci, Bidirectional Dijkstra
+
+### Added
+- **Sort Lab:** Cycle Sort (minimal writes) and a simplified **Timsort** (natural runs, reverse descending, insertion-sort to minrun, pairwise merge) — **16** sorts
+- **Search Lab:** Ternary Search and Fibonacci Search — **7** searches
+- **Path Lab:** Bidirectional Dijkstra (weighted meet-in-the-middle, same cell weights as Dijkstra) — **9** path algorithms
+- **Maze carve animation** — Kruskal, recursive backtracker, Prim, and binary-tree mazes record `grid.carveOrder`; Path Lab paints passages in that order (skipped for reduced-motion or >400 cells)
+- **Keyboard re-path** — Space/Enter paint (or drop S/E) re-runs the last algorithm, matching pointer-up live re-path
+
+### Changed
+- Tournaments and selects include the new algorithms
+- README documents 16 sorts, 9 path algorithms, 7 searches
+- PWA cache bumped to `algo-lab-v7`
+
 ## [2026-08-26] — v6.3 quiz honesty, live re-path, g/h/f
 
 ### Fixed

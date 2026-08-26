@@ -6,11 +6,11 @@ An interactive teaching lab built with pure HTML, CSS, and vanilla JavaScript �
 
 Three labs share the same chrome, theme, and sound toggle:
 
-- **Sort Lab** (`index.html`) — 14 sorting algorithms
-- **Path Lab** (`pathfinding.html`) — 8 pathfinding algorithms + maze generators
-- **Search Lab** (`search.html`) — 5 searching algorithms
+- **Sort Lab** (`index.html`) — 16 sorting algorithms
+- **Path Lab** (`pathfinding.html`) — 9 pathfinding algorithms + maze generators
+- **Search Lab** (`search.html`) — 7 searching algorithms
 
-![Sort](https://img.shields.io/badge/sort-14-blue) ![Pathfinding](https://img.shields.io/badge/path-8-indigo) ![Search](https://img.shields.io/badge/search-5-teal) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
+![Sort](https://img.shields.io/badge/sort-16-blue) ![Pathfinding](https://img.shields.io/badge/path-9-indigo) ![Search](https://img.shields.io/badge/search-7-teal) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
 
 ## Running
 
@@ -39,7 +39,7 @@ CI runs the same command on Node 20 via GitHub Actions (`.github/workflows/ci.ym
 
 ## Sort Lab
 
-### Algorithms (14)
+### Algorithms (16)
 
 | Algorithm | Best | Average | Worst | Stable | In-place | Memory |
 |-----------|------|---------|-------|--------|----------|--------|
@@ -57,8 +57,10 @@ CI runs the same command on Node 20 via GitHub Actions (`.github/workflows/ci.ym
 | Gnome | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
 | Odd-Even | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
 | Pancake | O(n) | O(n²) | O(n²) | No | Yes | O(1) |
+| Cycle | O(n²) | O(n²) | O(n²) | No | Yes | O(1) |
+| Timsort | O(n) | O(n log n) | O(n log n) | Yes | No | O(n) |
 
-Radix is LSD base 10 (non-negative integers). Comb uses a 1.3 shrink factor. Pancake sorts by prefix reversals.
+Radix is LSD base 10 (non-negative integers). Comb uses a 1.3 shrink factor. Pancake sorts by prefix reversals. Cycle sort writes each element at most once. Timsort (simplified) finds natural runs, reverses descending runs, insertion-sorts to minrun, then merges pairwise.
 
 Pure implementations live in `sorting-core.js` (`SortCore` in the browser / `module.exports` in Node). Visual runs still use `SortRunner` in `script.js`. Silent tournaments use `SortCore` when it is loaded.
 
@@ -78,7 +80,7 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 - Presentation Mode
 - Access heatmap + operations sparkline
 - Algorithm recommender
-- Benchmark tournament (all 14) with comparison matrix
+- Benchmark tournament (all 16) with comparison matrix
 - Learning cards (trivia + use cases)
 - Run history (last 8, `localStorage` key `sortLabHistory`)
 - Share URL, CSV export, copy summary
@@ -86,7 +88,7 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 
 ## Path Lab
 
-### Algorithms (8)
+### Algorithms (9)
 
 | Algorithm | Time | Weighted | Complete | Optimal | Heuristic |
 |-----------|------|----------|----------|---------|-----------|
@@ -96,10 +98,11 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 | A* | O((V + E) log V) | Yes | Yes | Yes (admissible h) | Manhattan / Chebyshev if diagonal |
 | Greedy Best-First | O((V + E) log V) | No | Yes | No | Manhattan / Chebyshev if diagonal |
 | Bidirectional BFS | O(V + E) | No | Yes | Unweighted shortest | None |
+| Bidirectional Dijkstra | O((V + E) log V) | Yes | Yes | Yes (non-negative) | None |
 | Weighted A* | O((V + E) log V) | Yes | Yes | No (w=1.5) | Manhattan / Chebyshev × 1.5 |
 | IDA* | O(b^d) | Yes | Yes | Yes (admissible h) | Manhattan / Chebyshev |
 
-Path cost is the sum of cell weights along the path **excluding start, including end**. Empty cells weigh `1`; weight cells weigh `5`. BFS / DFS / bidirectional BFS treat every step as cost 1 when *searching*, but reported path cost still uses actual weights.
+Path cost is the sum of cell weights along the path **excluding start, including end**. Empty cells weigh `1`; weight cells weigh `5`. BFS / DFS / bidirectional BFS treat every step as cost 1 when *searching*, but reported path cost still uses actual weights. Bidirectional Dijkstra searches from both terminals with the same cell weights as Dijkstra and reconstructs a cheapest path at the meeting point.
 
 Weighted A* scales the heuristic by `opts.weight` (default **1.5**). IDA* raises the f-cost bound by the minimum overflow; expansions are capped at 20 000.
 
@@ -115,14 +118,14 @@ Weighted A* scales the heuristic by `opts.weight` (default **1.5**). IDA* raises
 | Scatter Walls | Random walls (start/end stay free) |
 | Kruskal | Randomized Kruskal (union-find on even/even cells) |
 
-Carved mazes prefer even/even passage cells. Even dimensions get a short corridor so the bottom-right corner stays reachable. All maze helpers **return a new grid** and never mutate an input.
+Carved mazes prefer even/even passage cells. Even dimensions get a short corridor so the bottom-right corner stays reachable. All maze helpers **return a new grid** and never mutate an input. Kruskal, recursive backtracker, Prim, and binary-tree mazes attach a `carveOrder` array of newly emptied `{r,c}` cells. Path Lab animates that order (skipped when `prefers-reduced-motion` is set or when the order is longer than 400).
 
 ### Features
 
 - Interactive grid: drag to paint **Wall / Weight / Erase**; drag **S** / **E** to move terminals
-- **Live re-path**: after a completed search, painting or moving S/E re-runs the last algorithm instantly
+- **Live re-path**: after a completed search, painting or moving S/E (pointer-up or Space/Enter on the grid) re-runs the last algorithm instantly
 - Hover **g / h / f** on A*, Dijkstra, and Weighted A* cells after a search
-- Keyboard editor: focus the grid — **Arrows move · Space paint** (Space/Enter on S/E picks up the terminal)
+- Keyboard editor: focus the grid — **Arrows move · Space paint** (Space/Enter on S/E picks up the terminal; Space/Enter also re-paths)
 - Diagonal movement toggle (no corner-cutting through walls)
 - Race mode + algorithm tournament (rank: path cost → nodes expanded → time)
 - Teaching Mode, Step Mode, pause / resume / stop
@@ -135,7 +138,7 @@ Glyphs (not color alone): **S** start, **E** end, **●** weight.
 
 ## Search Lab
 
-### Algorithms (5)
+### Algorithms (7)
 
 | Algorithm | Average | Worst | Needs sorted |
 |-----------|---------|-------|--------------|
@@ -144,8 +147,10 @@ Glyphs (not color alone): **S** start, **E** end, **●** weight.
 | Jump | O(√n) | O(√n) | Yes |
 | Interpolation | O(log log n) | O(n) | Yes |
 | Exponential | O(log n) | O(log n) | Yes |
+| Ternary | O(log n) | O(log n) | Yes |
+| Fibonacci | O(log n) | O(log n) | Yes |
 
-Each core routine returns `{ found, index, probes, probeOrder }` and **never mutates** the input. Binary / jump / interpolation / exponential auto-sort the displayed array and show a note.
+Each core routine returns `{ found, index, probes, probeOrder }` and **never mutates** the input. Binary / jump / interpolation / exponential / ternary / Fibonacci auto-sort the displayed array and show a note.
 
 ### Features
 
@@ -164,7 +169,7 @@ Each core routine returns `{ found, index, probes, probeOrder }` and **never mut
 - Lab switcher in the top bar: Sort Lab · Path Lab · Search Lab
 - Dark / light theme — `localStorage` key `theme` (shared)
 - Sound beeps (Web Audio) — `localStorage` key `sound` (shared)
-- PWA manifest + service worker (`algo-lab-v6.3`) for offline use
+- PWA manifest + service worker (`algo-lab-v7`) for offline use
 - Skip link to the lab workspace
 - Keyboard cheat sheet (`?` or the top-bar `?` button)
 - `aria-live` status and teaching narration

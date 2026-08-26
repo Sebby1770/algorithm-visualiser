@@ -183,6 +183,38 @@ test("DFS finds some path if one exists (not necessarily shortest)", () => {
   assert.ok(result.path.length >= bfs.path.length);
 });
 
+test("Bidirectional Dijkstra finds a path on an open grid", () => {
+  const { grid, start, end } = openGrid(8, 10);
+  const before = snapshot(grid);
+  const result = PathCore.bidirectionalDijkstra(grid, start, end);
+  assertValidPath(grid, result, start, end, false);
+  assert.equal(result.algorithm, "bidirectionalDijkstra");
+  assert.ok(result.pathCost > 0);
+  const viaSearch = PathCore.search("bidirectionalDijkstra", grid, start, end);
+  assert.equal(viaSearch.found, true);
+  assert.equal(snapshot(grid), before);
+});
+
+test("Bidirectional Dijkstra prefers a lower-weight corridor like Dijkstra", () => {
+  const { grid, start, end } = parseGrid([
+    "S55E",
+    "....",
+  ]);
+  const cheap = PathCore.bidirectionalDijkstra(grid, start, end);
+  assertValidPath(grid, cheap, start, end, false);
+  assert.ok(
+    cheap.path.some((p) => p.r === 1),
+    "Bidirectional Dijkstra should detour through the cheap row"
+  );
+  assert.ok(
+    !cheap.path.some((p) => p.r === 0 && (p.c === 1 || p.c === 2)),
+    "Bidirectional Dijkstra should not walk the expensive weights"
+  );
+  assert.equal(cheap.pathCost, 5);
+  const dijkstra = PathCore.dijkstra(grid, start, end);
+  assert.equal(cheap.pathCost, dijkstra.pathCost);
+});
+
 test("Bidirectional BFS finds a path", () => {
   const { grid, start, end } = parseGrid([
     "S.#.E",
@@ -209,6 +241,7 @@ test("Unreachable end returns found=false and path=[]", () => {
     "astar",
     "greedy",
     "bidirectionalBfs",
+    "bidirectionalDijkstra",
     "weightedAstar",
     "idaStar",
   ]) {
@@ -232,6 +265,7 @@ test("Search algorithms do not mutate the original grid", () => {
   PathCore.astar(grid, start, end);
   PathCore.greedy(grid, start, end);
   PathCore.bidirectionalBfs(grid, start, end);
+  PathCore.bidirectionalDijkstra(grid, start, end);
   PathCore.weightedAstar(grid, start, end);
   PathCore.idaStar(grid, start, end);
   PathCore.astar(grid, start, end, { diagonal: true });
@@ -390,6 +424,17 @@ test("idaStar finds a path on an open grid", () => {
   assert.equal(result.algorithm, "idaStar");
   assert.ok(result.pathCost > 0);
   assert.equal(snapshot(grid), before);
+});
+
+test("mazeKruskal records a carveOrder of newly emptied cells", () => {
+  const grid = PathCore.mazeKruskal(15, 21, rngFrom(42));
+  assert.equal(Array.isArray(grid.carveOrder), true);
+  assert.ok(grid.carveOrder.length > 0, "carveOrder should list carved cells");
+  for (const p of grid.carveOrder) {
+    assert.equal(typeof p.r, "number");
+    assert.equal(typeof p.c, "number");
+    assert.notEqual(grid[p.r][p.c].type, "wall");
+  }
 });
 
 test("mazeKruskal: start/end walkable and BFS can reach end", () => {

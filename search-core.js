@@ -5,7 +5,15 @@
    ============================================================ */
 
 (function (root) {
-  const ALGORITHM_IDS = ["linear", "binary", "jump", "interpolation", "exponential"];
+  const ALGORITHM_IDS = [
+    "linear",
+    "binary",
+    "jump",
+    "interpolation",
+    "exponential",
+    "ternary",
+    "fibonacci",
+  ];
 
   function result(found, index, probeOrder) {
     return {
@@ -118,12 +126,75 @@
     return result(false, -1, probeOrder);
   }
 
+  function ternary(arr, target) {
+    if (!arr || !arr.length) return empty();
+    const probeOrder = [];
+    let lo = 0;
+    let hi = arr.length - 1;
+    while (lo <= hi) {
+      const third = Math.floor((hi - lo) / 3);
+      const mid1 = lo + third;
+      const mid2 = hi - third;
+      probeOrder.push(mid1);
+      if (arr[mid1] === target) return result(true, mid1, probeOrder);
+      if (mid2 !== mid1) {
+        probeOrder.push(mid2);
+        if (arr[mid2] === target) return result(true, mid2, probeOrder);
+      }
+      if (target < arr[mid1]) hi = mid1 - 1;
+      else if (target > arr[mid2]) lo = mid2 + 1;
+      else {
+        lo = mid1 + 1;
+        hi = mid2 - 1;
+      }
+    }
+    return result(false, -1, probeOrder);
+  }
+
+  function fibonacci(arr, target) {
+    if (!arr || !arr.length) return empty();
+    const n = arr.length;
+    const probeOrder = [];
+    let fibM2 = 0;
+    let fibM1 = 1;
+    let fibM = 1;
+    while (fibM < n) {
+      fibM2 = fibM1;
+      fibM1 = fibM;
+      fibM = fibM1 + fibM2;
+    }
+    let offset = -1;
+    while (fibM > 1) {
+      const i = Math.min(offset + fibM2, n - 1);
+      probeOrder.push(i);
+      if (arr[i] < target) {
+        fibM = fibM1;
+        fibM1 = fibM2;
+        fibM2 = fibM - fibM1;
+        offset = i;
+      } else if (arr[i] > target) {
+        fibM = fibM2;
+        fibM1 = fibM1 - fibM2;
+        fibM2 = fibM - fibM1;
+      } else {
+        return result(true, i, probeOrder);
+      }
+    }
+    if (fibM1 && offset + 1 < n) {
+      probeOrder.push(offset + 1);
+      if (arr[offset + 1] === target) return result(true, offset + 1, probeOrder);
+    }
+    return result(false, -1, probeOrder);
+  }
+
   const ALGORITHMS = {
     linear,
     binary,
     jump,
     interpolation,
     exponential,
+    ternary,
+    fibonacci,
   };
 
   function search(id, arr, target) {
@@ -140,6 +211,8 @@
     jump,
     interpolation,
     exponential,
+    ternary,
+    fibonacci,
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = api;

@@ -8,7 +8,15 @@
      searchLabHistory  — last 8 Search Lab runs
    ============================================================ */
 
-const ALGORITHM_IDS = ["linear", "binary", "jump", "interpolation", "exponential"];
+const ALGORITHM_IDS = [
+  "linear",
+  "binary",
+  "jump",
+  "interpolation",
+  "exponential",
+  "ternary",
+  "fibonacci",
+];
 
 const ALGORITHM_PROFILES = {
   linear: {
@@ -51,6 +59,22 @@ const ALGORITHM_PROFILES = {
     sorted: true,
     description: "Doubles a bound until the range is found, then binary-searches inside that window.",
   },
+  ternary: {
+    name: "Ternary Search",
+    best: "O(1)",
+    avg: "O(log n)",
+    worst: "O(log n)",
+    sorted: true,
+    description: "Splits the sorted range into thirds with two midpoints and discards one third each step.",
+  },
+  fibonacci: {
+    name: "Fibonacci Search",
+    best: "O(1)",
+    avg: "O(log n)",
+    worst: "O(log n)",
+    sorted: true,
+    description: "Probes Fibonacci-spaced indices so each remaining interval is a smaller Fibonacci number.",
+  },
 };
 
 const LEARNING_CARDS = {
@@ -74,6 +98,14 @@ const LEARNING_CARDS = {
     trivia: "Exponential search finds an unbounded or unknown-size range by doubling, then finishes with binary search.",
     useCase: "Searching infinite streams, unindexed logs, or a sorted array when the target is expected near the front.",
   },
+  ternary: {
+    trivia: "Ternary search on a sorted array uses two probes per step; it is the array cousin of the unimodal-function ternary search.",
+    useCase: "Teaching divide-and-conquer with a 1/3 discard, and some cache-oblivious layouts that like two probes per iteration.",
+  },
+  fibonacci: {
+    trivia: "Fibonacci search was designed for magnetic tapes: it only moves forward, using additions instead of division for the next index.",
+    useCase: "Sorted arrays on storage where division is costly, or when you want a binary-search analogue that only uses addition.",
+  },
 };
 
 const NEEDS_SORTED = {
@@ -81,6 +113,8 @@ const NEEDS_SORTED = {
   jump: true,
   interpolation: true,
   exponential: true,
+  ternary: true,
+  fibonacci: true,
 };
 
 const HISTORY_KEY = "searchLabHistory";
@@ -380,6 +414,8 @@ class SearchRunner {
       jump: () => this.jumpSearch(target),
       interpolation: () => this.interpolationSearch(target),
       exponential: () => this.exponentialSearch(target),
+      ternary: () => this.ternarySearch(target),
+      fibonacci: () => this.fibonacciSearch(target),
     };
 
     let outcome = { found: false, index: -1, probes: 0 };
@@ -523,6 +559,81 @@ class SearchRunner {
       if (v === target) return this.succeed(mid);
       if (v < target) lo = mid + 1;
       else hi = mid - 1;
+    }
+    return this.fail();
+  }
+
+  async ternarySearch(target) {
+    const a = this.array;
+    let lo = 0;
+    let hi = a.length - 1;
+    this.setBounds(lo, hi);
+    this.narrate(`Ternary search: two midpoints, discard a third, looking for ${target}.`);
+    while (lo <= hi) {
+      const third = Math.floor((hi - lo) / 3);
+      const mid1 = lo + third;
+      const mid2 = hi - third;
+      this.setBounds(lo, hi);
+      const v1 = await this.probe(mid1, `Lower third index ${mid1} is ${a[mid1]}.`);
+      if (v1 === target) return this.succeed(mid1);
+      if (mid2 !== mid1) {
+        const v2 = await this.probe(mid2, `Upper third index ${mid2} is ${a[mid2]}.`);
+        if (v2 === target) return this.succeed(mid2);
+      }
+      if (target < a[mid1]) {
+        this.narrate(`${target} < ${a[mid1]} — keep the left third.`);
+        hi = mid1 - 1;
+      } else if (target > a[mid2]) {
+        this.narrate(`${target} > ${a[mid2]} — keep the right third.`);
+        lo = mid2 + 1;
+      } else {
+        this.narrate(`${target} sits between the two mids — keep the middle third.`);
+        lo = mid1 + 1;
+        hi = mid2 - 1;
+      }
+      this.setBounds(lo, hi);
+    }
+    return this.fail();
+  }
+
+  async fibonacciSearch(target) {
+    const a = this.array;
+    const n = a.length;
+    if (!n) return this.fail();
+    this.narrate(`Fibonacci search: probe Fibonacci-spaced indices for ${target}.`);
+    let fibM2 = 0;
+    let fibM1 = 1;
+    let fibM = 1;
+    while (fibM < n) {
+      fibM2 = fibM1;
+      fibM1 = fibM;
+      fibM = fibM1 + fibM2;
+    }
+    let offset = -1;
+    while (fibM > 1) {
+      const i = Math.min(offset + fibM2, n - 1);
+      this.setBounds(offset + 1, Math.min(offset + fibM, n - 1));
+      const v = await this.probe(i, `Fibonacci probe at ${i} is ${a[i]} (F=${fibM2}).`);
+      if (v < target) {
+        this.narrate(`${v} < ${target} — drop the left Fibonacci block.`);
+        fibM = fibM1;
+        fibM1 = fibM2;
+        fibM2 = fibM - fibM1;
+        offset = i;
+      } else if (v > target) {
+        this.narrate(`${v} > ${target} — drop the right Fibonacci block.`);
+        fibM = fibM2;
+        fibM1 = fibM1 - fibM2;
+        fibM2 = fibM - fibM1;
+      } else {
+        return this.succeed(i);
+      }
+    }
+    if (fibM1 && offset + 1 < n) {
+      const i = offset + 1;
+      this.setBounds(i, i);
+      const v = await this.probe(i, `Last Fibonacci check at ${i}.`);
+      if (v === target) return this.succeed(i);
     }
     return this.fail();
   }

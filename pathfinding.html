@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Interactive pathfinding visualizer with BFS, DFS, Dijkstra, A*, weighted A*, IDA*, greedy best-first, bidirectional BFS, maze generators, and race mode." />
+  <meta name="description" content="Interactive pathfinding visualizer with BFS, DFS, Dijkstra, A*, weighted A*, IDA*, greedy best-first, bidirectional BFS, bidirectional Dijkstra, maze generators, and race mode." />
   <meta name="theme-color" content="#0b1220" />
   <title>Algo Lab — Pathfinding Visualizer</title>
   <link rel="manifest" href="manifest.json" />
@@ -52,6 +52,7 @@
               <option value="astar" selected>A*</option>
               <option value="greedy">Greedy Best-First</option>
               <option value="bidirectionalBfs">Bidirectional BFS</option>
+              <option value="bidirectionalDijkstra">Bidirectional Dijkstra</option>
               <option value="weightedAstar">Weighted A*</option>
               <option value="idaStar">IDA*</option>
             </select>
@@ -69,6 +70,7 @@
               <option value="astar">A*</option>
               <option value="greedy">Greedy Best-First</option>
               <option value="bidirectionalBfs">Bidirectional BFS</option>
+              <option value="bidirectionalDijkstra">Bidirectional Dijkstra</option>
               <option value="weightedAstar">Weighted A*</option>
               <option value="idaStar">IDA*</option>
             </select>
@@ -151,7 +153,7 @@
             <button id="resetBtn" class="btn btn-secondary" title="Shortcut: R">Reset Board</button>
           </div>
 
-          <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 8 algorithms on the current board">🏆 Algorithm Tournament</button>
+          <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 9 algorithms on the current board">🏆 Algorithm Tournament</button>
 
           <p class="shortcut-hint">Arrows move · Space paint · Space pause · S start · G maze · R reset · C clear · Esc stop · 1 wall · 2 weight · 3 erase · ? shortcuts</p>
         </section>

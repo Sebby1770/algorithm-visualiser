@@ -8,7 +8,17 @@
      pathLabHistory — last 8 Path Lab runs
    ============================================================ */
 
-const ALGORITHM_IDS = ["bfs", "dfs", "dijkstra", "astar", "greedy", "bidirectionalBfs", "weightedAstar", "idaStar"];
+const ALGORITHM_IDS = [
+  "bfs",
+  "dfs",
+  "dijkstra",
+  "astar",
+  "greedy",
+  "bidirectionalBfs",
+  "bidirectionalDijkstra",
+  "weightedAstar",
+  "idaStar",
+];
 
 const ALGORITHM_PROFILES = {
   bfs: {
@@ -71,6 +81,16 @@ const ALGORITHM_PROFILES = {
     heuristic: "None",
     description: "Runs BFS from both start and end until the frontiers meet. Often much faster on open maps.",
   },
+  bidirectionalDijkstra: {
+    name: "Bidirectional Dijkstra",
+    time: "O((V + E) log V)",
+    space: "O(V)",
+    weighted: true,
+    complete: true,
+    optimal: "Yes (non-negative)",
+    heuristic: "None",
+    description: "Dijkstra from both start and end until the searches meet. Optimal on weighted grids; often expands fewer nodes.",
+  },
   weightedAstar: {
     name: "Weighted A*",
     time: "O((V + E) log V)",
@@ -117,6 +137,10 @@ const LEARNING_CARDS = {
   bidirectionalBfs: {
     trivia: "Two searches meeting in the middle can turn an O(b^d) frontier into roughly O(b^{d/2}) — a huge win on open maps.",
     useCase: "Meeting-in-the-middle queries: word ladders, unweighted maps, and some bidirectional Dijkstra variants.",
+  },
+  bidirectionalDijkstra: {
+    trivia: "Bidirectional Dijkstra is how many map routers shrink the search: two priority queues meeting in the middle still yield a cheapest path.",
+    useCase: "Weighted road maps and any non-negative graph where you can search from both origin and destination.",
   },
   weightedAstar: {
     trivia: "Weighted A* (WA*) inflates h by w>1. With w=1.5 you often expand far fewer nodes than A* while staying near-optimal.",
@@ -361,6 +385,19 @@ class GridView {
     }
   }
 
+  paintAsWalls() {
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const btn = this.cells[r] && this.cells[r][c];
+        if (!btn) continue;
+        btn.className = "path-cell is-wall";
+        btn.textContent = "";
+        btn.removeAttribute("title");
+        btn.setAttribute("aria-label", `Row ${r + 1}, column ${c + 1}, wall`);
+      }
+    }
+  }
+
   markExpand(grid, r, c) {
     if (this.frontierKey) {
       this.overlay.frontier.delete(this.frontierKey);
@@ -423,6 +460,7 @@ class PathLabApp {
     this.animStartedAt = 0;
     this.lastAlgo = null;
     this.lastScores = null;
+    this.carveToken = 0;
   }
 
   init() {
@@ -669,6 +707,7 @@ class PathLabApp {
     if (this.cursorMoveTerminal) {
       this.cursorMoveTerminal = null;
       this.setStatus("Placed " + (this.grid[r][c].type === "end" ? "end" : "start"));
+      if (this.lastAlgo) this.repathInstant();
       return;
     }
     if (r === this.start.r && c === this.start.c) {
@@ -682,6 +721,7 @@ class PathLabApp {
       return;
     }
     this.paintAt(r, c, this.getBrush());
+    if (this.lastAlgo) this.repathInstant();
   }
 
   getRows() {
@@ -745,11 +785,20 @@ class PathLabApp {
     if (end) this.end = end;
   }
 
+  prefersReducedMotion() {
+    return (
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  }
+
   generateBoard() {
     if (this.isRunning) return;
     this.lastAlgo = null;
     this.lastScores = null;
     this.cursorMoveTerminal = null;
+    this.carveToken++;
     const rows = this.getRows();
     const cols = this.getCols();
     const maze = dom.maze.value;
@@ -791,6 +840,40 @@ class PathLabApp {
     this.viewA.setCursor(this.grid, this.start.r, this.start.c);
     this.resetMetrics();
     this.setStatus(`Generated ${MAZE_LABELS[maze] || maze} (${rows}×${cols})`);
+    this.maybeAnimateCarve(grid);
+  }
+
+  maybeAnimateCarve(grid) {
+    const order = grid && grid.carveOrder;
+    if (!Array.isArray(order) || !order.length) return;
+    if (order.length > 400) return;
+    if (this.prefersReducedMotion()) return;
+    const token = this.carveToken;
+    this.playCarveAnimation(order, token);
+  }
+
+  playCarveAnimation(order, token) {
+    this.views().forEach((view) => view.paintAsWalls());
+    const delay = Math.max(4, Math.min(16, Math.floor(600 / Math.max(1, order.length))));
+    let i = 0;
+    const step = () => {
+      if (token !== this.carveToken || this.isRunning) {
+        if (token === this.carveToken) this.syncViews();
+        return;
+      }
+      const batch = Math.max(1, Math.ceil(order.length / 120));
+      const end = Math.min(order.length, i + batch);
+      for (; i < end; i++) {
+        const p = order[i];
+        this.views().forEach((view) => view.paintCell(this.grid, p.r, p.c));
+      }
+      if (i >= order.length) {
+        this.syncViews();
+        return;
+      }
+      setTimeout(step, delay);
+    };
+    step();
   }
 
   applyDecodedMap(decoded) {
@@ -815,6 +898,7 @@ class PathLabApp {
     this.lastAlgo = null;
     this.lastScores = null;
     this.cursorMoveTerminal = null;
+    this.carveToken++;
     dom.maze.value = "empty";
     this.grid = PathCore.makeGrid(this.getRows(), this.getCols());
     this.placeDefaultTerminals(this.grid);

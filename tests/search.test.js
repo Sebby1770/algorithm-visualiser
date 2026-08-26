@@ -13,13 +13,15 @@ function assertInRange(result, n) {
   }
 }
 
-test("ALGORITHM_IDS lists 5 search algorithms", () => {
+test("ALGORITHM_IDS lists 7 search algorithms", () => {
   assert.deepEqual(SearchCore.ALGORITHM_IDS, [
     "linear",
     "binary",
     "jump",
     "interpolation",
     "exponential",
+    "ternary",
+    "fibonacci",
   ]);
 });
 
@@ -80,6 +82,26 @@ test("jump and exponential find existing values and miss others", () => {
     assert.equal(miss.found, false, id);
     assert.equal(miss.index, -1, id);
     assertInRange(miss, arr.length);
+  }
+});
+
+test("ternary and fibonacci find existing values and miss others", () => {
+  const arr = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24];
+  for (const id of ["ternary", "fibonacci"]) {
+    for (let i = 0; i < arr.length; i++) {
+      const hit = SearchCore.search(id, arr, arr[i]);
+      assert.equal(hit.found, true, id + " should find " + arr[i]);
+      assert.equal(arr[hit.index], arr[i], id);
+      assertInRange(hit, arr.length);
+    }
+    const miss = SearchCore.search(id, arr, 17);
+    assert.equal(miss.found, false, id);
+    assert.equal(miss.index, -1, id);
+    assertInRange(miss, arr.length);
+    const before = SearchCore.search(id, arr, 0);
+    assert.equal(before.found, false, id + " miss below");
+    const after = SearchCore.search(id, arr, 99);
+    assert.equal(after.found, false, id + " miss above");
   }
 });
 
