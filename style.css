@@ -1107,6 +1107,81 @@ body.presentation-active {
 }
 
 /* ---------- Accessibility ---------- */
+.skip-link {
+  position: absolute;
+  left: -999px;
+  top: 8px;
+  padding: 0.5rem 0.85rem;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.skip-link:focus {
+  left: 8px;
+  top: 8px;
+  z-index: 100;
+}
+
+.cheat-sheet {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  padding: 1.1rem 1.25rem 1.25rem;
+  max-width: 26rem;
+  width: calc(100% - 2rem);
+  box-shadow: var(--shadow);
+}
+
+.cheat-sheet::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.cheat-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.cheat-sheet-header h2 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.cheat-sheet-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.cheat-sheet-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  font-size: 0.88rem;
+}
+
+.cheat-sheet kbd {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--surface-elevated);
+  min-width: 1.5rem;
+  text-align: center;
+}
+
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;

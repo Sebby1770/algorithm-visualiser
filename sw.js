@@ -1,5 +1,5 @@
-/* Algo Lab — Service Worker v6.2 */
-const CACHE_NAME = "algo-lab-v6.2";
+/* Algo Lab — Service Worker v6.3 */
+const CACHE_NAME = "algo-lab-v6.3";
 const ASSETS = [
   "./",
   "./index.html",

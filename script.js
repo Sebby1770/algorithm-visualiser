@@ -228,6 +228,16 @@ const MAX_HISTORY = 8;
 // ---------- DOM references ----------
 const $ = (id) => document.getElementById(id);
 
+function isTypingTarget(el) {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+function isCheatSheetKey(e) {
+  return e.key === "?" || (e.shiftKey && (e.key === "/" || e.code === "Slash"));
+}
+
 const dom = {
   algorithm: $("algorithm"),
   algorithmRace: $("algorithmRace"),
@@ -283,8 +293,12 @@ const dom = {
   quizFeedback: $("quizFeedback"),
   recommenderContent: $("recommenderContent"),
   learningCard: $("learningCard"),
+  learningCardsPanel: $("learningCardsPanel"),
   learningTrivia: $("learningTrivia"),
   learningUseCase: $("learningUseCase"),
+  cheatSheet: $("cheatSheet"),
+  cheatSheetBtn: $("cheatSheetBtn"),
+  cheatSheetClose: $("cheatSheetClose"),
   heatmapPrimary: $("heatmapPrimary"),
   heatmapSecondary: $("heatmapSecondary"),
   countingArrayPanel: $("countingArrayPanel"),
@@ -1612,6 +1626,31 @@ class SortLabApp {
     dom.themeToggle.addEventListener("click", () => this.toggleTheme());
 
     document.addEventListener("keydown", (e) => this.handleKeyboard(e));
+
+    if (dom.cheatSheetBtn) {
+      dom.cheatSheetBtn.addEventListener("click", () => this.toggleCheatSheet());
+    }
+    if (dom.cheatSheetClose) {
+      dom.cheatSheetClose.addEventListener("click", () => {
+        if (dom.cheatSheet && typeof dom.cheatSheet.close === "function") dom.cheatSheet.close();
+      });
+    }
+    if (dom.cheatSheet) {
+      dom.cheatSheet.addEventListener("click", (e) => {
+        if (e.target === dom.cheatSheet && typeof dom.cheatSheet.close === "function") dom.cheatSheet.close();
+      });
+    }
+  }
+
+  toggleCheatSheet() {
+    const dlg = dom.cheatSheet || document.getElementById("cheatSheet");
+    if (!dlg) return;
+    if (typeof dlg.showModal === "function") {
+      if (dlg.open) dlg.close();
+      else dlg.showModal();
+    } else {
+      dlg.hidden = !dlg.hidden;
+    }
   }
 
   handleKeyboard(e) {
@@ -1621,7 +1660,13 @@ class SortLabApp {
       return;
     }
 
-    if (e.target.matches("input, select, textarea")) return;
+    if (isTypingTarget(e.target)) return;
+    if (isCheatSheetKey(e)) {
+      e.preventDefault();
+      this.toggleCheatSheet();
+      return;
+    }
+    if (dom.cheatSheet && dom.cheatSheet.open) return;
 
     switch (e.code) {
       case "Space":
@@ -1730,23 +1775,28 @@ class SortLabApp {
     const quizActive = dom.quizMode.checked;
     const hiddenName = quizActive ? "???" : profile.name;
     dom.profilePanel.classList.toggle("quiz-hidden", quizActive);
-    dom.profilePanel.innerHTML = `
-      <h3 class="profile-name">${hiddenName}</h3>
-      <p class="profile-desc">${quizActive ? "Algorithm hidden — watch the animation and guess!" : profile.description}</p>
-      <dl class="profile-grid">
+    const gridHtml = quizActive
+      ? ""
+      : `<dl class="profile-grid">
         <div><dt>Best</dt><dd>${profile.best}</dd></div>
         <div><dt>Average</dt><dd>${profile.avg}</dd></div>
         <div><dt>Worst</dt><dd>${profile.worst}</dd></div>
         <div><dt>Stable</dt><dd>${profile.stable ? "Yes" : "No"}</dd></div>
         <div><dt>In-place</dt><dd>${profile.inPlace ? "Yes" : "No"}</dd></div>
         <div><dt>Memory</dt><dd>${profile.memory}</dd></div>
-      </dl>
+      </dl>`;
+    dom.profilePanel.innerHTML = `
+      <h3 class="profile-name">${hiddenName}</h3>
+      <p class="profile-desc">${quizActive ? "Algorithm hidden — watch the animation and guess!" : profile.description}</p>
+      ${gridHtml}
     `;
     if (quizActive) {
       dom.panePrimaryLabel.textContent = "???";
     } else {
       dom.panePrimaryLabel.textContent = profile.name;
     }
+    if (dom.learningCard) dom.learningCard.hidden = quizActive;
+    if (dom.learningCardsPanel) dom.learningCardsPanel.hidden = quizActive;
   }
 
   updateLearningCard() {

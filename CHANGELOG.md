@@ -2,6 +2,20 @@
 
 All notable changes to Algo Lab (Algorithm Visualizer).
 
+## [2026-08-26] — v6.3 quiz honesty, live re-path, g/h/f
+
+### Fixed
+- **Quiz Mode** no longer leaks Big-O: the profile grid (Best/Avg/Worst/Stable) is not rendered, and learning cards are hidden while quiz is on
+
+### Added
+- **Live re-path** in Path Lab — after a completed search, painting walls/weights or dragging S/E instantly re-runs the last algorithm
+- **g / h / f scores** on A*, Dijkstra, and Weighted A* (hover a cell; `title` shows one decimal)
+- **Skip link** (“Skip to lab”) as the first body element on all three pages
+- **Keyboard cheat sheet** — press `?` or `Shift+/`, or the top-bar `?` button (ignored while typing in inputs)
+
+### Changed
+- PWA cache bumped to `algo-lab-v6.3`
+
 ## [2026-08-26] — v6.2 teaching honesty & shareable maps
 
 ### Fixed

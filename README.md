@@ -74,7 +74,7 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 - Teaching Mode (narrated steps) — merge sort compares **aux keys**, not overwritten live bars
 - Identity colors (stability hues from original indices; equal heights stay distinguishable)
 - Bar values shown when n ≤ 24
-- Quiz Mode (guess the algorithm)
+- Quiz Mode (guess the algorithm — name, Big-O grid, and learning cards stay hidden)
 - Presentation Mode
 - Access heatmap + operations sparkline
 - Algorithm recommender
@@ -82,7 +82,7 @@ Random · Sorted · Nearly Sorted · Reversed · Few Unique · Sawtooth · Custo
 - Learning cards (trivia + use cases)
 - Run history (last 8, `localStorage` key `sortLabHistory`)
 - Share URL, CSV export, copy summary
-- Keyboard: `Space` pause · `S` start · `G` generate · `R` reset · `Esc` exit present
+- Keyboard: `Space` pause · `S` start · `G` generate · `R` reset · `Esc` exit present · `?` cheat sheet
 
 ## Path Lab
 
@@ -120,6 +120,8 @@ Carved mazes prefer even/even passage cells. Even dimensions get a short corrido
 ### Features
 
 - Interactive grid: drag to paint **Wall / Weight / Erase**; drag **S** / **E** to move terminals
+- **Live re-path**: after a completed search, painting or moving S/E re-runs the last algorithm instantly
+- Hover **g / h / f** on A*, Dijkstra, and Weighted A* cells after a search
 - Keyboard editor: focus the grid — **Arrows move · Space paint** (Space/Enter on S/E picks up the terminal)
 - Diagonal movement toggle (no corner-cutting through walls)
 - Race mode + algorithm tournament (rank: path cost → nodes expanded → time)
@@ -127,7 +129,7 @@ Carved mazes prefer even/even passage cells. Even dimensions get a short corrido
 - Algorithm profile + learning cards
 - Run history (last 8, `localStorage` key `pathLabHistory`)
 - Share URL encodes algorithm, maze, rows, cols, speed, diagonal, and the painted **map** (`rowsxcols;sr,sc;er,ec;rle`)
-- Keyboard: `Arrows` cursor · `Space` paint (grid) / pause · `S` start · `G` maze · `R` reset · `C` clear path · `Esc` stop · `1` wall · `2` weight · `3` erase
+- Keyboard: `Arrows` cursor · `Space` paint (grid) / pause · `S` start · `G` maze · `R` reset · `C` clear path · `Esc` stop · `1` wall · `2` weight · `3` erase · `?` cheat sheet
 
 Glyphs (not color alone): **S** start, **E** end, **●** weight.
 
@@ -155,14 +157,16 @@ Each core routine returns `{ found, index, probes, probeOrder }` and **never mut
 - Algorithm profiles + learning cards
 - Share URL: `?algo=&n=&target=`
 - Run history (last 8, `localStorage` key `searchLabHistory`)
-- Keyboard: `Space` pause · `S` start · `G` generate · `R` reset
+- Keyboard: `Space` pause · `S` start · `G` generate · `R` reset · `?` cheat sheet
 
 ## Shared UI
 
 - Lab switcher in the top bar: Sort Lab · Path Lab · Search Lab
 - Dark / light theme — `localStorage` key `theme` (shared)
 - Sound beeps (Web Audio) — `localStorage` key `sound` (shared)
-- PWA manifest + service worker (`algo-lab-v6.2`) for offline use
+- PWA manifest + service worker (`algo-lab-v6.3`) for offline use
+- Skip link to the lab workspace
+- Keyboard cheat sheet (`?` or the top-bar `?` button)
 - `aria-live` status and teaching narration
 - `:focus-visible` outlines; `prefers-reduced-motion` skips animation delay
 

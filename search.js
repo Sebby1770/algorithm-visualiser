@@ -131,7 +131,20 @@ const dom = {
   learningTrivia: $("learningTrivia"),
   learningUseCase: $("learningUseCase"),
   sortedNote: $("sortedNote"),
+  cheatSheet: $("cheatSheet"),
+  cheatSheetBtn: $("cheatSheetBtn"),
+  cheatSheetClose: $("cheatSheetClose"),
 };
+
+function isTypingTarget(el) {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+function isCheatSheetKey(e) {
+  return e.key === "?" || (e.shiftKey && (e.key === "/" || e.code === "Slash"));
+}
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -624,10 +637,40 @@ class SearchLabApp {
     dom.nextStepBtn.addEventListener("click", () => this.nextStep());
     dom.themeToggle.addEventListener("click", () => this.toggleTheme());
     document.addEventListener("keydown", (e) => this.handleKeyboard(e));
+    if (dom.cheatSheetBtn) {
+      dom.cheatSheetBtn.addEventListener("click", () => this.toggleCheatSheet());
+    }
+    if (dom.cheatSheetClose) {
+      dom.cheatSheetClose.addEventListener("click", () => {
+        if (dom.cheatSheet && typeof dom.cheatSheet.close === "function") dom.cheatSheet.close();
+      });
+    }
+    if (dom.cheatSheet) {
+      dom.cheatSheet.addEventListener("click", (e) => {
+        if (e.target === dom.cheatSheet && typeof dom.cheatSheet.close === "function") dom.cheatSheet.close();
+      });
+    }
+  }
+
+  toggleCheatSheet() {
+    const dlg = dom.cheatSheet || document.getElementById("cheatSheet");
+    if (!dlg) return;
+    if (typeof dlg.showModal === "function") {
+      if (dlg.open) dlg.close();
+      else dlg.showModal();
+    } else {
+      dlg.hidden = !dlg.hidden;
+    }
   }
 
   handleKeyboard(e) {
-    if (e.target.matches("input, select, textarea")) return;
+    if (isTypingTarget(e.target)) return;
+    if (isCheatSheetKey(e)) {
+      e.preventDefault();
+      this.toggleCheatSheet();
+      return;
+    }
+    if (dom.cheatSheet && dom.cheatSheet.open) return;
     switch (e.code) {
       case "Space":
         e.preventDefault();

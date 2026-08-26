@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <a class="skip-link" href="#workspace">Skip to lab</a>
   <div class="app-shell">
     <header class="topbar">
       <div class="topbar-start">
@@ -33,11 +34,12 @@
           <input type="checkbox" id="soundToggle" aria-label="Toggle sound" />
           <span>🔊 Sound</span>
         </label>
+        <button id="cheatSheetBtn" class="icon-btn" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
         <button id="themeToggle" class="icon-btn" aria-label="Toggle dark mode">🌙</button>
       </div>
     </header>
 
-    <div class="workspace">
+    <div class="workspace" id="workspace">
       <aside class="sidebar">
         <section class="panel">
           <h2 class="panel-title">Controls</h2>
@@ -155,7 +157,7 @@
 
           <button id="tournamentBtn" type="button" class="btn btn-accent btn-full" title="Run all 14 algorithms on current data">🏆 Benchmark Tournament</button>
 
-          <p class="shortcut-hint">Space pause · S start · G generate · R reset · Esc exit present</p>
+          <p class="shortcut-hint">Space pause · S start · G generate · R reset · Esc exit present · ? shortcuts</p>
         </section>
 
         <section class="panel" id="recommenderPanel">
@@ -276,6 +278,21 @@
     <div id="presentationVisualizer" class="presentation-visualizer"></div>
     <div id="presentationHeatmap" class="presentation-heatmap"></div>
   </div>
+
+  <dialog id="cheatSheet" class="cheat-sheet" aria-labelledby="cheatSheetTitle">
+    <div class="cheat-sheet-header">
+      <h2 id="cheatSheetTitle">Keyboard shortcuts</h2>
+      <button type="button" id="cheatSheetClose" class="icon-btn" aria-label="Close cheat sheet">×</button>
+    </div>
+    <ul class="cheat-sheet-list">
+      <li><kbd>Space</kbd> Pause / resume</li>
+      <li><kbd>S</kbd> Start sort</li>
+      <li><kbd>G</kbd> Generate array</li>
+      <li><kbd>R</kbd> Reset / generate</li>
+      <li><kbd>Esc</kbd> Exit presentation</li>
+      <li><kbd>?</kbd> Toggle this cheat sheet</li>
+    </ul>
+  </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <div id="a11yAnnouncer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>

@@ -188,7 +188,20 @@ const dom = {
   learningCard: $("learningCard"),
   learningTrivia: $("learningTrivia"),
   learningUseCase: $("learningUseCase"),
+  cheatSheet: $("cheatSheet"),
+  cheatSheetBtn: $("cheatSheetBtn"),
+  cheatSheetClose: $("cheatSheetClose"),
 };
+
+function isTypingTarget(el) {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+function isCheatSheetKey(e) {
+  return e.key === "?" || (e.shiftKey && (e.key === "/" || e.code === "Slash"));
+}
 
 function cellKey(r, c) {
   return r + "," + c;
@@ -253,6 +266,7 @@ class GridView {
     this.frontierKey = null;
     this.showCursor = showCursor;
     this.cursor = { r: 0, c: 0 };
+    this.scores = {};
   }
 
   emptyOverlay() {
@@ -268,6 +282,7 @@ class GridView {
     this.cols = cols;
     this.overlay = this.emptyOverlay();
     this.frontierKey = null;
+    this.scores = {};
     this.cursor = {
       r: Math.max(0, Math.min(this.cursor.r, Math.max(0, rows - 1))),
       c: Math.max(0, Math.min(this.cursor.c, Math.max(0, cols - 1))),
@@ -331,6 +346,13 @@ class GridView {
     else if (this.overlay.frontier.has(id)) state = "frontier";
     else if (this.overlay.visited.has(id)) state = "visited";
     btn.setAttribute("aria-label", `Row ${r + 1}, column ${c + 1}, ${state}`);
+
+    if (this.scores && this.scores[id]) {
+      const s = this.scores[id];
+      btn.title = `g=${Number(s.g).toFixed(1)} h=${Number(s.h).toFixed(1)} f=${Number(s.f).toFixed(1)}`;
+    } else {
+      btn.removeAttribute("title");
+    }
   }
 
   paintAll(grid) {
@@ -361,6 +383,7 @@ class GridView {
 
   paintResult(grid, result) {
     this.clearOverlay();
+    this.scores = (result && result.scores) || {};
     if (result && result.visitedOrder) {
       result.visitedOrder.forEach((p) => this.overlay.visited.add(cellKey(p.r, p.c)));
     }
@@ -398,6 +421,8 @@ class PathLabApp {
     this.cursorMoveTerminal = null;
     this.pendingSharedMap = null;
     this.animStartedAt = 0;
+    this.lastAlgo = null;
+    this.lastScores = null;
   }
 
   init() {
@@ -507,6 +532,31 @@ class PathLabApp {
     window.addEventListener("pointercancel", () => this.endPointer());
 
     document.addEventListener("keydown", (e) => this.handleKeyboard(e));
+
+    if (dom.cheatSheetBtn) {
+      dom.cheatSheetBtn.addEventListener("click", () => this.toggleCheatSheet());
+    }
+    if (dom.cheatSheetClose) {
+      dom.cheatSheetClose.addEventListener("click", () => {
+        if (dom.cheatSheet && typeof dom.cheatSheet.close === "function") dom.cheatSheet.close();
+      });
+    }
+    if (dom.cheatSheet) {
+      dom.cheatSheet.addEventListener("click", (e) => {
+        if (e.target === dom.cheatSheet && typeof dom.cheatSheet.close === "function") dom.cheatSheet.close();
+      });
+    }
+  }
+
+  toggleCheatSheet() {
+    const dlg = dom.cheatSheet || document.getElementById("cheatSheet");
+    if (!dlg) return;
+    if (typeof dlg.showModal === "function") {
+      if (dlg.open) dlg.close();
+      else dlg.showModal();
+    } else {
+      dlg.hidden = !dlg.hidden;
+    }
   }
 
   bindPointer(gridEl) {
@@ -518,8 +568,14 @@ class PathLabApp {
   }
 
   handleKeyboard(e) {
-    if (e.target.closest(".learning-card")) return;
-    if (e.target.matches("input, select, textarea")) return;
+    if (isTypingTarget(e.target)) return;
+    if (isCheatSheetKey(e)) {
+      e.preventDefault();
+      this.toggleCheatSheet();
+      return;
+    }
+    if (dom.cheatSheet && dom.cheatSheet.open) return;
+    if (e.target.closest && e.target.closest(".learning-card")) return;
 
     const gridFocused = e.target.closest(".path-grid");
     const arrowKey =
@@ -691,6 +747,8 @@ class PathLabApp {
 
   generateBoard() {
     if (this.isRunning) return;
+    this.lastAlgo = null;
+    this.lastScores = null;
     this.cursorMoveTerminal = null;
     const rows = this.getRows();
     const cols = this.getCols();
@@ -754,6 +812,8 @@ class PathLabApp {
 
   resetBoard() {
     if (this.isRunning) return;
+    this.lastAlgo = null;
+    this.lastScores = null;
     this.cursorMoveTerminal = null;
     dom.maze.value = "empty";
     this.grid = PathCore.makeGrid(this.getRows(), this.getCols());
@@ -766,6 +826,10 @@ class PathLabApp {
   }
 
   clearPath() {
+    this.lastAlgo = null;
+    this.lastScores = null;
+    this.viewA.scores = {};
+    this.viewB.scores = {};
     this.viewA.clearOverlay();
     this.viewB.clearOverlay();
     this.syncViews();
@@ -815,9 +879,41 @@ class PathLabApp {
   }
 
   endPointer() {
+    const wasPainting = this.pointer.painting || !!this.pointer.terminal;
     this.pointer.painting = false;
     this.pointer.brush = null;
     this.pointer.terminal = null;
+    if (wasPainting && this.lastAlgo && !this.isRunning) this.repathInstant();
+  }
+
+  repathInstant() {
+    if (!this.lastAlgo || this.isRunning) return;
+    const opts = this.getOpts();
+    const result = PathCore.search(this.lastAlgo, this.grid, this.start, this.end, opts);
+    this.viewA.scores = result.scores || {};
+    this.viewA.clearOverlay();
+    this.viewA.paintResult(this.grid, result);
+    this.lastScores = result.scores;
+    dom.metricsPrimary.innerHTML = this.metricsHtml({
+      nodesExpanded: result.nodesExpanded,
+      pathLength: result.found ? result.path.length : 0,
+      pathCost: result.found ? result.pathCost : 0,
+      elapsedMs: 0,
+    });
+    const raceVisible =
+      dom.raceMode.checked && dom.paneSecondary && !dom.paneSecondary.classList.contains("hidden");
+    if (raceVisible) {
+      const resultB = PathCore.search(dom.algorithmRace.value, this.grid, this.start, this.end, opts);
+      this.viewB.scores = resultB.scores || {};
+      this.viewB.clearOverlay();
+      this.viewB.paintResult(this.grid, resultB);
+      dom.metricsSecondary.innerHTML = this.metricsHtml({
+        nodesExpanded: resultB.nodesExpanded,
+        pathLength: resultB.found ? resultB.path.length : 0,
+        pathCost: resultB.found ? resultB.pathCost : 0,
+        elapsedMs: 0,
+      });
+    }
   }
 
   paintAt(r, c, brush) {
@@ -1032,6 +1128,10 @@ class PathLabApp {
 
     try {
       await this.animateResults(resultA, resultB);
+      this.lastAlgo = algo;
+      this.lastScores = resultA.scores;
+      this.viewA.scores = resultA.scores || {};
+      if (resultB) this.viewB.scores = resultB.scores || {};
       const elapsed = this.liveElapsed();
       const primary = this.summarizeResult(algo, resultA, computeA, elapsed);
       const secondary = resultB
@@ -1076,6 +1176,8 @@ class PathLabApp {
   }
 
   async animateResults(resultA, resultB) {
+    this.viewA.scores = (resultA && resultA.scores) || {};
+    this.viewB.scores = (resultB && resultB.scores) || {};
     const pairs = resultB
       ? [
           [this.viewA, resultA, dom.metricsPrimary],

@@ -482,3 +482,36 @@ test("decodeMap rejects invalid strings", () => {
   assert.equal(PathCore.decodeMap("3x4;0,0;2,3;###"), null);
   assert.equal(PathCore.decodeMap(null), null);
 });
+
+test("A* scores include start g=0 and finite end g", () => {
+  const { grid, start, end } = openGrid(3, 4);
+  const result = PathCore.astar(grid, start, end);
+  assert.equal(result.found, true);
+  assert.ok(result.scores && typeof result.scores === "object");
+  const startScore = result.scores["0,0"];
+  assert.ok(startScore, "start key 0,0 should be present");
+  assert.equal(startScore.g, 0);
+  const endKey = end.r + "," + end.c;
+  assert.ok(result.scores[endKey], "end should have a score");
+  assert.equal(Number.isFinite(result.scores[endKey].g), true);
+  for (const k of Object.keys(result.scores)) {
+    assert.match(k, /^\d+,\d+$/);
+  }
+});
+
+test("finish still has found, path, and visitedOrder", () => {
+  const { grid, start, end } = openGrid(4, 4);
+  const bfs = PathCore.bfs(grid, start, end);
+  assert.equal(typeof bfs.found, "boolean");
+  assert.ok(Array.isArray(bfs.path));
+  assert.ok(Array.isArray(bfs.visitedOrder));
+  const astar = PathCore.astar(grid, start, end);
+  assert.equal(typeof astar.found, "boolean");
+  assert.ok(Array.isArray(astar.path));
+  assert.ok(Array.isArray(astar.visitedOrder));
+  assert.equal(astar.found, true);
+  assert.ok(astar.path.length > 0);
+  assert.ok(astar.visitedOrder.length > 0);
+  assert.ok(astar.scores && astar.scores["0,0"]);
+  assert.equal(astar.scores["0,0"].g, 0);
+});

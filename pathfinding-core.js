@@ -162,9 +162,23 @@
     return cost;
   }
 
-  function finish(algorithm, grid, found, path, visitedOrder, frontierPeak) {
+  function buildScores(gScore, end, opts, hWeight) {
+    const scores = {};
+    if (!gScore || typeof gScore.forEach !== "function") return scores;
+    const w = typeof hWeight === "number" && hWeight > 0 ? hWeight : 1;
+    gScore.forEach((g, id) => {
+      const comma = String(id).indexOf(",");
+      if (comma < 0) return;
+      const cell = { r: Number(id.slice(0, comma)), c: Number(id.slice(comma + 1)) };
+      const h = heuristic(cell, end, opts);
+      scores[id] = { g: g, h: h, f: g + w * h };
+    });
+    return scores;
+  }
+
+  function finish(algorithm, grid, found, path, visitedOrder, frontierPeak, extra) {
     const ok = !!found && path && path.length > 0;
-    return {
+    const result = {
       found: ok,
       path: ok ? path : [],
       visitedOrder: visitedOrder || [],
@@ -173,6 +187,8 @@
       nodesExpanded: (visitedOrder && visitedOrder.length) || 0,
       algorithm,
     };
+    if (extra && extra.scores) result.scores = extra.scores;
+    return result;
   }
 
   function trivial(algorithm, start) {
@@ -351,7 +367,9 @@
       closed.add(id);
       visitedOrder.push({ r: cur.r, c: cur.c });
       if (sameCell(cur, end)) {
-        return finish("dijkstra", grid, true, reconstructPath(cameFrom, end, start), visitedOrder, frontierPeak);
+        return finish("dijkstra", grid, true, reconstructPath(cameFrom, end, start), visitedOrder, frontierPeak, {
+          scores: buildScores(dist, end, o),
+        });
       }
       const nbrs = neighbors(grid, cur.r, cur.c, o);
       for (let i = 0; i < nbrs.length; i++) {
@@ -367,7 +385,9 @@
         }
       }
     }
-    return finish("dijkstra", grid, false, [], visitedOrder, frontierPeak);
+    return finish("dijkstra", grid, false, [], visitedOrder, frontierPeak, {
+      scores: buildScores(dist, end, o),
+    });
   }
 
   function astar(grid, start, end, opts) {
@@ -399,7 +419,9 @@
       closed.add(id);
       visitedOrder.push({ r: cur.r, c: cur.c });
       if (sameCell(cur, end)) {
-        return finish("astar", grid, true, reconstructPath(cameFrom, end, start), visitedOrder, frontierPeak);
+        return finish("astar", grid, true, reconstructPath(cameFrom, end, start), visitedOrder, frontierPeak, {
+          scores: buildScores(gScore, end, o),
+        });
       }
       const nbrs = neighbors(grid, cur.r, cur.c, o);
       for (let i = 0; i < nbrs.length; i++) {
@@ -416,7 +438,9 @@
         }
       }
     }
-    return finish("astar", grid, false, [], visitedOrder, frontierPeak);
+    return finish("astar", grid, false, [], visitedOrder, frontierPeak, {
+      scores: buildScores(gScore, end, o),
+    });
   }
 
   function weightedAstar(grid, start, end, opts) {
@@ -449,7 +473,9 @@
       closed.add(id);
       visitedOrder.push({ r: cur.r, c: cur.c });
       if (sameCell(cur, end)) {
-        return finish("weightedAstar", grid, true, reconstructPath(cameFrom, end, start), visitedOrder, frontierPeak);
+        return finish("weightedAstar", grid, true, reconstructPath(cameFrom, end, start), visitedOrder, frontierPeak, {
+          scores: buildScores(gScore, end, o, weight),
+        });
       }
       const nbrs = neighbors(grid, cur.r, cur.c, o);
       for (let i = 0; i < nbrs.length; i++) {
@@ -466,7 +492,9 @@
         }
       }
     }
-    return finish("weightedAstar", grid, false, [], visitedOrder, frontierPeak);
+    return finish("weightedAstar", grid, false, [], visitedOrder, frontierPeak, {
+      scores: buildScores(gScore, end, o, weight),
+    });
   }
 
   function greedy(grid, start, end, opts) {
