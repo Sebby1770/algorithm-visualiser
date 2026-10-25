@@ -42,9 +42,12 @@
   --path-visited: #93c5fd;
   --path-frontier: #c4b5fd;
   --path-path: #f59e0b;
+  color-scheme: light;
 }
 
 [data-theme="dark"] {
+  /* Native selects, range inputs and scrollbars follow the theme too. */
+  color-scheme: dark;
   --bg: #0b1220;
   --bg-accent: #111b2e;
   --surface: #131c2e;
@@ -159,10 +162,12 @@ body {
 
 .lab-switcher {
   display: inline-flex;
+  flex-wrap: wrap;
   padding: 0.18rem;
   gap: 0.15rem;
   background: var(--secondary);
   border-radius: 999px;
+  max-width: 100%;
 }
 
 .lab-pill {
@@ -189,6 +194,7 @@ body {
 
 .topbar-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
 }
@@ -1276,9 +1282,20 @@ body.presentation-active {
     align-items: flex-start;
   }
 
+  /* Five pills don't fit one row on a phone: wrap them and soften the
+     pill shape so the second row still reads as one control. */
   .lab-switcher {
     width: 100%;
     justify-content: center;
+    border-radius: 18px;
+  }
+
+  .lab-pill {
+    padding: 0.38rem 0.7rem;
+  }
+
+  .topbar-actions {
+    gap: 0.5rem;
   }
 }
 

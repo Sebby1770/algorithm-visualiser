@@ -1,7 +1,7 @@
 {
-  "name": "Algo Lab — Sorting, Pathfinding & Search",
+  "name": "Algo Lab — Sorting, Pathfinding, Search, Databases & Hypervisors",
   "short_name": "Algo Lab",
-  "description": "Interactive algorithm lab with 16 sorting algorithms, 9 pathfinding algorithms, 7 search algorithms, teaching mode, tournaments, and offline support.",
+  "description": "Interactive systems lab: 16 sorting algorithms, 9 pathfinding algorithms, 7 search algorithms, a working SQL database engine (B+ trees, buffer pool, WAL, crash recovery, query planner) and a hypervisor simulator (trap-and-emulate, EPT vs shadow paging, vCPU scheduling, memory overcommit, live migration). Teaching mode, step-through, and offline support.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1220",
@@ -21,6 +21,36 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["education", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Sort Lab",
+      "url": "./index.html",
+      "description": "Sorting algorithm visualizer"
+    },
+    {
+      "name": "Path Lab",
+      "url": "./pathfinding.html",
+      "description": "Grid pathfinding and mazes"
+    },
+    {
+      "name": "Search Lab",
+      "url": "./search.html",
+      "description": "Array search algorithms"
+    },
+    {
+      "name": "DB Lab",
+      "url": "./database.html",
+      "description": "SQL engine internals: B+ trees, buffer pool, WAL, recovery"
+    },
+    {
+      "name": "Hypervisor Lab",
+      "url": "./hypervisor.html",
+      "description": "VM exits, nested paging, vCPU scheduling, live migration"
+    }
+  ],
+  "categories": [
+    "education",
+    "utilities"
+  ],
   "lang": "en"
 }
