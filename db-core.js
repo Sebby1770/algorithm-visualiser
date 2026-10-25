@@ -715,6 +715,34 @@
     return { statements: new Parser(sql).parseStatements() };
   }
 
+  /**
+   * Splits a script into statements without running anything. Statements
+   * before a syntax error are still returned, mirroring how execute() runs
+   * everything up to the first failure.
+   */
+  function splitStatements(sql) {
+    const statements = [];
+    let parser;
+    try {
+      parser = new Parser(sql);
+    } catch (err) {
+      if (!(err instanceof DbError)) throw err;
+      return { statements, error: { message: err.message, position: err.position, sql: String(sql).trim(), start: 0 } };
+    }
+    for (;;) {
+      const startIndex = parser.i;
+      try {
+        const stmt = parser.nextStatement();
+        if (!stmt) return { statements, error: null };
+        statements.push({ sql: stmt.sql, start: stmt.start, end: stmt.end, kind: stmt.ast.type });
+      } catch (err) {
+        if (!(err instanceof DbError)) throw err;
+        const span = parser.statementSpan(startIndex);
+        return { statements, error: { message: err.message, position: err.position, sql: span.sql, start: span.start } };
+      }
+    }
+  }
+
   // ---------- B+ tree ----------
 
   /**
@@ -1763,6 +1791,14 @@
       return { push: (event) => this.emit({ type: "btree", index: idx.name, event }) };
     }
 
+    /**
+     * The tree's shape after one complete index operation, so a viewer can
+     * show every intermediate state (skipped for big trees to keep traces small).
+     */
+    emitTreeState(idx) {
+      if (this.sink && idx.tree && idx.tree.size <= 200) this.emit({ type: "btree-state", index: idx.name, tree: idx.tree.snapshot() });
+    }
+
     // ----- disk -----
 
     isIndexPage(pageId) {
@@ -1862,6 +1898,7 @@
         if (key === null) return;
         try {
           idx.tree.insert(key, rid, sink);
+          this.emitTreeState(idx);
         } catch (err) {
           if (err instanceof DbError) throw new DbError(`UNIQUE constraint failed: ${table.name}.${idx.column} (duplicate ${formatValue(key)})`);
           throw err;
@@ -1915,7 +1952,9 @@
       if (!this.indexesLive) return;
       for (const idx of table.indexes) {
         const key = values[idx.colIndex];
-        if (key !== null) idx.tree.insert(key, rid, this.btreeSink(idx));
+        if (key === null) continue;
+        idx.tree.insert(key, rid, this.btreeSink(idx));
+        this.emitTreeState(idx);
       }
     }
 
@@ -1923,7 +1962,9 @@
       if (!this.indexesLive) return;
       for (const idx of table.indexes) {
         const key = values[idx.colIndex];
-        if (key !== null) idx.tree.delete(key, rid, this.btreeSink(idx));
+        if (key === null) continue;
+        idx.tree.delete(key, rid, this.btreeSink(idx));
+        this.emitTreeState(idx);
       }
     }
 
@@ -1936,6 +1977,7 @@
         const sink = this.btreeSink(idx);
         if (a !== null) idx.tree.delete(a, rid, sink);
         if (b !== null) idx.tree.insert(b, rid, sink);
+        if (a !== null || b !== null) this.emitTreeState(idx);
       }
     }
 
@@ -3405,6 +3447,7 @@ SELECT account, SUM(amount) AS total FROM ledger GROUP BY account ORDER BY accou
     SAMPLE_SCRIPTS,
     tokenize,
     parse,
+    splitStatements,
     formatPlan,
     compareValues,
     createRng,
