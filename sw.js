@@ -55,19 +55,21 @@ self.addEventListener("fetch", (event) => {
   const isNavigation = event.request.mode === "navigate";
   const cacheKey = isNavigation ? url.origin + url.pathname : event.request;
 
+  // Network first, cache as the offline fallback: a new deploy shows up on the
+  // very next load instead of one visit late (cache-first served stale files).
+  // "no-cache" revalidates with the server (a cheap 304 when nothing changed)
+  // instead of trusting the browser's heuristic HTTP cache.
   event.respondWith(
-    caches.match(cacheKey, { ignoreSearch: isNavigation }).then((cached) => {
-      const fetched = fetch(event.request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(cacheKey, clone));
-          }
-          return response;
-        })
-        .catch(() => cached || Response.error());
-
-      return cached || fetched;
-    })
+    fetch(event.request, { cache: "no-cache" })
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(cacheKey, clone));
+        }
+        return response;
+      })
+      .catch(() =>
+        caches.match(cacheKey, { ignoreSearch: isNavigation }).then((cached) => cached || Response.error())
+      )
   );
 });

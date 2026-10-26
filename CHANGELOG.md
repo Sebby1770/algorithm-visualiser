@@ -2,6 +2,28 @@
 
 All notable changes to Algo Lab (Algorithm Visualizer).
 
+## [2026-10-26] — v8 DB Lab & Hypervisor Lab
+
+### Added
+- **DB Lab** (`database.html`, `db-core.js`) — a working SQL engine you can watch: tokenizer + recursive-descent parser, cost-based planner (seq vs index scan, index nested loop / hash / nested loop joins, hash aggregation), B+ tree indexes with split/borrow/merge, LRU and Clock buffer pool, steal/no-force write-ahead log with the WAL rule, CLR-based rollback, ARIES-style crash recovery and checkpoints. Step-by-step playback replays the engine's real event trace per statement; seven sample scripts
+- **Hypervisor Lab** (`hypervisor.html`, `hypervisor-core.js`) — a VMM simulator running HV-ASM guest programs: trap-and-emulate VM exits with per-reason costs, EPT vs shadow paging behind a tagged TLB, round-robin / credit / fair-share vCPU scheduling, lazy allocation, KSM page sharing with copy-on-write, ballooning, host swap and pre-copy live migration; seven scenarios, add-your-own-VM with an assembler
+- `lab-common.js` — shared theme, sound, cheat sheet, toast, clipboard, storage and playback timing for the new labs
+- Tests: `tests/database.test.js` (30), `tests/hypervisor.test.js` (23), `tests/site.test.js` (page/asset/switcher/manifest integrity) — 121 tests in total
+- PWA manifest shortcuts for every lab; CI syntax-checks every browser script
+
+### Fixed
+- **Hidden controls showing:** `.field { display: flex }` overrode the `hidden` attribute, so Sort Lab and Search Lab always showed the "Custom Array" input; a global `[hidden]` rule fixes it everywhere
+- **Stale deploys:** the service worker was cache-first, so returning visitors saw the previous version for a visit; it is now network-first with revalidation (`cache: "no-cache"`), falling back to the cache offline
+- **Offline share links:** pages are matched without their query string, so links like `search.html?algo=…` open offline
+- **Theme flash:** the saved theme is applied before first paint on every page
+- Top-bar actions and the lab switcher wrap instead of overflowing on phones; the Sort Lab operations chart no longer overflows its pane at 375 px
+
+### Changed
+- Lab switcher lists five labs on every page; README and manifest describe all five
+- GitHub Pages deploy copies `*.html *.css *.js` and fails if anything the service worker precaches is missing
+- Native form controls and scrollbars follow the theme (`color-scheme`)
+- PWA cache bumped to `algo-lab-v8`
+
 ## [2026-08-26] — v7 Cycle, Timsort, Ternary, Fibonacci, Bidirectional Dijkstra
 
 ### Added

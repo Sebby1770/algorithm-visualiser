@@ -779,4 +779,17 @@
   .db-heap-pages {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .db-plan-node {
+    min-width: 0;
+  }
+
+  .db-plan-stats {
+    margin-left: 0;
+  }
+
+  .db-plan-children {
+    margin-left: 0.35rem;
+    padding-left: 0.45rem;
+  }
 }

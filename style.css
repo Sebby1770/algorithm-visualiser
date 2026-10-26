@@ -91,6 +91,12 @@
   padding: 0;
 }
 
+/* Classes like .field set display:flex, which would otherwise beat the
+   browser's own [hidden] rule and show "hidden" controls. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background:
@@ -1054,6 +1060,7 @@ body.presentation-active {
 .ops-chart {
   flex: 1;
   height: 56px;
+  min-width: 0; /* let the canvas shrink below its width attribute on phones */
   max-width: 100%;
   border-radius: var(--radius-sm);
   background: var(--surface);

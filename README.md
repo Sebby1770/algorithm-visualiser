@@ -1,16 +1,18 @@
-# Algo Lab — Sorting, Pathfinding & Search Visualizer
+# Algo Lab — Algorithms, Databases & Hypervisors, Visualized
 
 **Live lab:** [https://sebby1770.github.io/algorithm-visualiser/](https://sebby1770.github.io/algorithm-visualiser/)
 
-An interactive teaching lab built with pure HTML, CSS, and vanilla JavaScript — no frameworks, no build step, no npm runtime dependencies.
+An interactive systems teaching lab built with pure HTML, CSS, and vanilla JavaScript — no frameworks, no build step, no npm runtime dependencies.
 
-Three labs share the same chrome, theme, and sound toggle:
+Five labs share the same chrome, theme, and sound toggle:
 
 - **Sort Lab** (`index.html`) — 16 sorting algorithms
 - **Path Lab** (`pathfinding.html`) — 9 pathfinding algorithms + maze generators
 - **Search Lab** (`search.html`) — 7 searching algorithms
+- **DB Lab** (`database.html`) — a working SQL database engine: parser, cost-based planner, B+ tree indexes, buffer pool, write-ahead log, ARIES-style crash recovery
+- **Hypervisor Lab** (`hypervisor.html`) — a virtual machine monitor running real guest programs: trap-and-emulate VM exits, EPT vs shadow paging, vCPU scheduling, memory overcommit, live migration
 
-![Sort](https://img.shields.io/badge/sort-16-blue) ![Pathfinding](https://img.shields.io/badge/path-9-indigo) ![Search](https://img.shields.io/badge/search-7-teal) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
+![Sort](https://img.shields.io/badge/sort-16-blue) ![Pathfinding](https://img.shields.io/badge/path-9-indigo) ![Search](https://img.shields.io/badge/search-7-teal) ![DB](https://img.shields.io/badge/SQL-engine-orange) ![Hypervisor](https://img.shields.io/badge/VMM-simulator-pink) ![PWA](https://img.shields.io/badge/PWA-offline-purple)
 
 ## Running
 
@@ -18,9 +20,11 @@ No build tools. Open the files in a modern browser, or serve locally (recommende
 
 ```bash
 python3 -m http.server
-# → http://localhost:8000                 Sort Lab
+# → http://localhost:8000                    Sort Lab
 # → http://localhost:8000/pathfinding.html   Path Lab
 # → http://localhost:8000/search.html        Search Lab
+# → http://localhost:8000/database.html      DB Lab
+# → http://localhost:8000/hypervisor.html    Hypervisor Lab
 ```
 
 macOS: `open index.html` · Linux: `xdg-open index.html`
@@ -29,13 +33,20 @@ macOS: `open index.html` · Linux: `xdg-open index.html`
 
 ## Tests
 
-Sorting, pathfinding, and search cores are covered by Node’s built-in test runner (no packages to install):
+Every engine is a pure module that also loads in Node, covered by Node’s built-in test runner (no packages to install):
 
 ```bash
-node --test tests/pathfinding.test.js tests/sorting.test.js tests/search.test.js
+node --test tests/*.test.js
 ```
 
-CI runs the same command on Node 20 via GitHub Actions (`.github/workflows/ci.yml`). Static files deploy to GitHub Pages (`.github/workflows/pages.yml`).
+| Suite | Covers |
+|-------|--------|
+| `sorting.test.js`, `pathfinding.test.js`, `search.test.js` | the original three labs |
+| `database.test.js` | SQL parsing, NULL logic, joins vs a brute-force join, planner choices, B+ tree property tests (random inserts/deletes at orders 3–6), LRU vs Clock, the WAL rule, rollback, crash recovery after steal, checkpoints, determinism |
+| `hypervisor.test.js` | the assembler, instruction semantics, every exit reason and its cost, EPT vs shadow equivalence, lazy allocation, weighted fairness, KSM + copy-on-write, swap data integrity, ballooning, migration convergence, 1500-tick invariant checks of every scenario, determinism |
+| `site.test.js` | every page’s scripts/styles exist and are precached, the five-lab switcher is identical everywhere, the manifest and Pages deploy are complete |
+
+CI (`.github/workflows/ci.yml`, Node 20) syntax-checks every browser script with `node --check`, then runs the suites. Static files deploy to GitHub Pages (`.github/workflows/pages.yml`), which copies `*.html *.css *.js` and fails if anything the service worker precaches is missing.
 
 ## Sort Lab
 
@@ -164,44 +175,97 @@ Each core routine returns `{ found, index, probes, probeOrder }` and **never mut
 - Run history (last 8, `localStorage` key `searchLabHistory`)
 - Keyboard: `Space` pause · `S` start · `G` generate · `R` reset · `?` cheat sheet
 
+## DB Lab
+
+A small but real relational database engine (`db-core.js`, global `DbCore`) and a page that animates its internals. Every statement is parsed, planned, executed and logged by the engine; the page replays the engine’s own event trace — it never fakes an animation.
+
+### SQL supported
+
+`CREATE TABLE` (INT / REAL / TEXT, `PRIMARY KEY`, `NOT NULL`, `UNIQUE`) · `CREATE [UNIQUE] INDEX` · `DROP TABLE [IF EXISTS]` · `INSERT … VALUES` (multi-row) · `SELECT [DISTINCT]` with inner `JOIN … ON`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY` (columns, aliases, positions), `LIMIT … OFFSET` · `UPDATE` · `DELETE` · `BEGIN` / `COMMIT` / `ROLLBACK` · `EXPLAIN` and `EXPLAIN ANALYZE`
+
+Expressions: arithmetic (INT ÷ INT truncates; ÷ 0 is NULL), `||`, comparisons, `AND`/`OR`/`NOT` with SQL three-valued logic, `IS [NOT] NULL`, `[NOT] BETWEEN`, `[NOT] IN (…)`, `[NOT] LIKE` (case-insensitive), `COUNT(*)`, `COUNT([DISTINCT] x)`, `SUM`, `AVG`, `MIN`, `MAX`, `LOWER`, `UPPER`, `LENGTH`, `ABS`, `ROUND`, `COALESCE`. Strict typing (no silent coercion), constraint errors, and syntax errors that point at the exact character.
+
+### Engine internals
+
+| Layer | What it does |
+|-------|--------------|
+| Planner | Cost model in page reads with statistics (row count, distinct values, min/max). Chooses **SeqScan vs IndexScan** (and explains why), pushes single-table predicates below joins, and picks **Index Nested Loop**, **Hash Join** (build the smaller side) or **Nested Loop** |
+| Executor | Operators materialise rows but emit events in true execution order; nested loops genuinely re-scan their inner input; `actualRows`/`loops` for EXPLAIN ANALYZE |
+| B+ tree | Order 3–8, leaf chaining for range scans, real split / borrow / merge / root collapse, and an invariant checker |
+| Buffer pool | 3–16 frames, **LRU** or **Clock** (second chance), pin counts, dirty bits, hit/miss/eviction counters; index node pages are charged to the pool too |
+| WAL | Log-first changes with page LSNs, forced at COMMIT, and the **WAL rule** enforced before any dirty page reaches disk (steal / no-force) |
+| Transactions | Autocommit or `BEGIN`; statement-level atomicity; `ROLLBACK` writes compensation log records (CLRs) |
+| Recovery | **Crash** drops the pool, the unflushed log tail and the in-memory indexes; **Recover** runs ARIES-style analysis → redo (repeating history) → undo → index rebuild; **Checkpoint** shortens redo |
+
+Simplifications are deliberate and documented in the code: single session (no locking), DDL written straight through to the catalog, indexes rebuilt rather than logged, tombstoned heap slots never reused.
+
+### Features
+
+- SQL console with seven sample scripts: starter shop, index vs full scan, three join algorithms, GROUP BY & aggregates, transactions & rollback, B+ tree splits & merges, crash & recovery
+- **Run** (instant) or **Run step-by-step**: each statement runs on its own and its real events animate the query plan, B+ tree (redrawn after every index operation), buffer pool frames, heap pages and the WAL, with plain-English narration
+- Plan tree with estimated vs actual rows, cost, and the planner’s reason for each choice
+- Crash banner listing exactly what was lost, plus a five-phase recovery stepper with winners / losers / redone / skipped / undone
+- Engine options: frames, LRU / Clock, rows per page, B+ tree order
+- Step Mode, pause / stop / skip, concept cards, run history (`dbLabHistory`), share links (`?sample=` or `?sql=` base64url)
+- Keyboard: `Ctrl/⌘+Enter` run · `Space` pause · `N` next step · `Esc` stop · `K` crash · `V` recover · `?` cheat sheet
+
+## Hypervisor Lab
+
+A virtual machine monitor simulator (`hypervisor-core.js`, global `HyperCore`). Guests run real programs written in **HV-ASM**, a tiny instruction set with an assembler; one tick is one instruction slot per physical CPU, and everything is deterministic for a seed.
+
+### What it models
+
+| Area | Details |
+|------|---------|
+| Trap-and-emulate | Ordinary instructions run directly; `OUT`, `IN`, `HLT`, `CLI`/`STI`, `CPUID`, `VMCALL`, `PAUSE` and (under shadow paging) `WRPT` cause **VM exits** that keep the pCPU in the VMM for a per-reason cost |
+| Memory virtualization | Guest-virtual → guest-physical (guest page table) → host-physical (p2m / EPT). **EPT**: no exits on page-table writes, 3-reference walks per TLB miss. **Shadow paging**: 1-reference walks but `PT_WRITE` and `SHADOW_PF` exits. Per-vCPU 4-entry TLB tagged by VM |
+| Scheduling | **Round-robin**, Xen-style **credit** (weights, UNDER/OVER priority, caps) and CFS-style **fair share**, with a timer interrupt (`EXTINT`) at the end of each quantum |
+| Memory overcommit | Lazy allocation (`EPT_VIOLATION` on first touch), **KSM** page sharing with copy-on-write, **ballooning** (hypervisor-requested or `VMCALL 1`), and host **swap** |
+| Live migration | Iterative **pre-copy** over a link of configurable bandwidth, dirty-page tracking per round, stop-and-copy with measured downtime, switchover to “host B” |
+
+`checkInvariants()` cross-checks frames, p2m tables, swap, TLBs, shadow tables and run queues; the tests run it throughout 1500 ticks of every scenario.
+
+### Scenarios
+
+Trap-and-emulate · Shadow paging vs EPT · Credit scheduler (512/256/256 weights) · Memory overcommit (24 guest pages on 12 frames) · Live migration (a converging VM vs a dirty writer that never converges) · Noisy neighbour (CPU cap) · Spin lock & PAUSE
+
+### Features
+
+- pCPU timeline: guest time in each VM’s colour, VMM time striped, idle grey; hover to inspect any tick
+- VM cards: vCPU registers, pc, interrupt flag and TLB; the program listing with privileged instructions highlighted and a live marker per vCPU; exits by reason; console output; pause / balloon / migrate / destroy
+- Host memory map (frames by owner, shared frames with reference counts, swap slots, per-VM p2m strips), the latest address translation drawn stage by stage, TLB statistics
+- VM exit log with filter and exits-per-tick sparkline; CPU fairness bars (actual share vs weight entitlement and cap); migration rounds chart and host B
+- Live controls: scheduler, EPT / shadow, quantum, KSM; rebuild controls: pCPUs, host frames; **Add a VM** with any sample program or your own HV-ASM (assembler errors shown with line numbers)
+- Teaching Mode narration, concept cards, run history (`hypervisorLabHistory`), share links (`?scenario=&paging=&scheduler=&pcpus=`)
+- Keyboard: `Space` play/pause · `N` or `.` step · `R` reset · `P` toggle paging · `?` cheat sheet
+
 ## Shared UI
 
-- Lab switcher in the top bar: Sort Lab · Path Lab · Search Lab
-- Dark / light theme — `localStorage` key `theme` (shared)
+- Lab switcher in the top bar: Sort Lab · Path Lab · Search Lab · DB Lab · Hypervisor Lab (wraps on phones)
+- Dark / light theme — `localStorage` key `theme` (shared), applied before first paint; native controls follow it via `color-scheme`
 - Sound beeps (Web Audio) — `localStorage` key `sound` (shared)
-- PWA manifest + service worker (`algo-lab-v7`) for offline use
-- Skip link to the lab workspace
-- Keyboard cheat sheet (`?` or the top-bar `?` button)
-- `aria-live` status and teaching narration
-- `:focus-visible` outlines; `prefers-reduced-motion` skips animation delay
+- PWA manifest with a shortcut per lab + service worker (`algo-lab-v8`): network-first with revalidation, cached copies for offline use, and share links with query strings open offline
+- Skip link, keyboard cheat sheet (`?`), `aria-live` status and narration, `:focus-visible` outlines, `prefers-reduced-motion` support
+- The two newer labs share `lab-common.js` (theme, sound, cheat sheet, toast, clipboard, storage, playback timing)
 
 ## File structure
 
 ```
 algorithm-visualiser/
-├── index.html                 # Sort Lab
-├── pathfinding.html           # Path Lab
-├── search.html                # Search Lab
-├── style.css                  # Shared theme + path grid + search cells
-├── script.js                  # Sort Lab app (visual SortRunner)
-├── sorting-core.js            # Pure sorts (browser + Node)
-├── pathfinding.js             # Path Lab UI
-├── pathfinding-core.js        # Search + mazes (browser + Node)
-├── search.js                  # Search Lab UI
-├── search-core.js             # Pure searches (browser + Node)
-├── tests/pathfinding.test.js
-├── tests/sorting.test.js
-├── tests/search.test.js
-├── .github/workflows/ci.yml
-├── .github/workflows/pages.yml
-├── sw.js                      # Service worker
-├── manifest.json              # PWA manifest
-├── CHANGELOG.md
-├── LICENSE                    # MIT
-└── README.md
+├── index.html · script.js · sorting-core.js          # Sort Lab
+├── pathfinding.html · pathfinding.js · pathfinding-core.js   # Path Lab
+├── search.html · search.js · search-core.js          # Search Lab
+├── database.html · database.js · database.css · db-core.js   # DB Lab
+├── hypervisor.html · hypervisor.js · hypervisor.css · hypervisor-core.js   # Hypervisor Lab
+├── lab-common.js              # Shared chrome for the newer labs
+├── style.css                  # Shared theme and components
+├── tests/                     # node --test suites (one per engine + site.test.js)
+├── .github/workflows/         # CI + GitHub Pages deploy
+├── sw.js · manifest.json      # PWA
+├── CHANGELOG.md · LICENSE · README.md
 ```
 
-`sorting-core.js` exports `SortCore`, `pathfinding-core.js` exports `PathCore`, and `search-core.js` exports `SearchCore` in the browser (`module.exports` in Node).
+Each `*-core.js` file is a pure, UI-free module: `SortCore`, `PathCore`, `SearchCore`, `DbCore` and `HyperCore` in the browser, `module.exports` in Node.
 
 ## License
 
