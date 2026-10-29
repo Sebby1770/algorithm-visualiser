@@ -368,6 +368,16 @@ test("mazePrim: shape and terminals", () => {
   assert.equal(PathCore.bfs(grid, start, end).found, true);
 });
 
+test("mazeRecursiveDivision: start can always reach end (no gap gets sealed)", () => {
+  for (const [rows, cols] of [[21, 41], [20, 40], [7, 9], [16, 20]]) {
+    for (let seed = 1; seed <= 60; seed++) {
+      const grid = PathCore.mazeRecursiveDivision(rows, cols, rngFrom(seed));
+      const r = PathCore.bfs(grid, { r: 0, c: 0 }, { r: rows - 1, c: cols - 1 });
+      assert.ok(r.found, `${rows}x${cols} seed ${seed} is unsolvable`);
+    }
+  }
+});
+
 test("mazeRecursiveDivision: shape and terminals", () => {
   const grid = PathCore.mazeRecursiveDivision(16, 20, rngFrom(3));
   assertMazeShape(grid, 16, 20);
@@ -559,4 +569,19 @@ test("finish still has found, path, and visitedOrder", () => {
   assert.ok(astar.visitedOrder.length > 0);
   assert.ok(astar.scores && astar.scores["0,0"]);
   assert.equal(astar.scores["0,0"].g, 0);
+});
+
+test("idaStar: hitting the expansion cap is reported as capped, not as unreachable", () => {
+  const grid = PathCore.makeGrid(21, 41);
+  for (let r = 5; r <= 15; r++) PathCore.setCell(grid, r, 20, { type: "wall", weight: 1 });
+  const capped = PathCore.idaStar(grid, { r: 10, c: 6 }, { r: 10, c: 34 }, {});
+  assert.equal(capped.found, false);
+  assert.equal(capped.capped, true);
+  assert.equal(PathCore.astar(grid, { r: 10, c: 6 }, { r: 10, c: 34 }, {}).found, true, "the end really is reachable");
+
+  const blocked = PathCore.makeGrid(5, 5);
+  for (let r = 0; r < 5; r++) PathCore.setCell(blocked, r, 2, { type: "wall", weight: 1 });
+  const none = PathCore.idaStar(blocked, { r: 0, c: 0 }, { r: 4, c: 4 }, {});
+  assert.equal(none.found, false);
+  assert.equal(none.capped, undefined, "a genuinely unreachable end is not 'capped'");
 });

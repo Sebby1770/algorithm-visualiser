@@ -256,6 +256,25 @@ const MAX_HISTORY = 8;
 // ---------- DOM references ----------
 const $ = (id) => document.getElementById(id);
 
+// localStorage throws when site data is blocked (or quota is full); the lab
+// must still load and run, so every read/write goes through these guards.
+const store = {
+  get(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* storage unavailable — keep going without persistence */
+    }
+  },
+};
+
 function isTypingTarget(el) {
   if (!el || !el.tagName) return false;
   const tag = el.tagName;
@@ -598,7 +617,7 @@ class OperationsChart {
 // ---------- Audio ----------
 class AudioManager {
   constructor() {
-    this.enabled = localStorage.getItem("sound") === "true";
+    this.enabled = store.get("sound") === "true";
     this.ctx = null;
   }
 
@@ -639,7 +658,7 @@ class AudioManager {
 
   setEnabled(enabled) {
     this.enabled = enabled;
-    localStorage.setItem("sound", String(enabled));
+    store.set("sound", String(enabled));
   }
 }
 
@@ -1315,8 +1334,9 @@ class SortRunner {
       const bucket = this.array[i] - min;
       this.trackAccess(i);
       if (!this.silent) this.bars[i]?.classList.add("bucket");
+      // Tallies are bookkeeping, not array writes — SortCore.counting (and the
+      // tournament) count only the n output writes, so the live metric matches.
       count[bucket]++;
-      this.metrics.writes++;
       this.onCountingArrayUpdate?.(count, min, max, bucket);
       this.narrate(`Incrementing count for value ${this.array[i]} (bucket ${bucket}).`);
       this.recordOperation();
@@ -1721,7 +1741,7 @@ class SortLabApp {
   }
 
   initTheme() {
-    const saved = localStorage.getItem("theme") || "dark";
+    const saved = store.get("theme") || "dark";
     document.documentElement.setAttribute("data-theme", saved);
     dom.themeToggle.textContent = saved === "dark" ? "☀️" : "🌙";
     dom.themeToggle.setAttribute("aria-pressed", saved === "dark");
@@ -1999,7 +2019,7 @@ class SortLabApp {
 
   loadQuizScore() {
     try {
-      const raw = localStorage.getItem(QUIZ_SCORE_KEY);
+      const raw = store.get(QUIZ_SCORE_KEY);
       return raw ? JSON.parse(raw) : { correct: 0, total: 0 };
     } catch {
       return { correct: 0, total: 0 };
@@ -2007,7 +2027,7 @@ class SortLabApp {
   }
 
   saveQuizScore() {
-    localStorage.setItem(QUIZ_SCORE_KEY, JSON.stringify(this.quizScore));
+    store.set(QUIZ_SCORE_KEY, JSON.stringify(this.quizScore));
     this.updateQuizScoreDisplay();
   }
 
@@ -2093,10 +2113,10 @@ class SortLabApp {
     const params = new URLSearchParams(window.location.search);
     if (!params.toString()) return;
 
-    if (params.has("algo") && ALGORITHM_PROFILES[params.get("algo")]) {
+    if (params.has("algo") && Object.hasOwn(ALGORITHM_PROFILES, params.get("algo"))) {
       dom.algorithm.value = params.get("algo");
     }
-    if (params.has("dataset") && DATASET_LABELS[params.get("dataset")]) {
+    if (params.has("dataset") && Object.hasOwn(DATASET_LABELS, params.get("dataset"))) {
       dom.dataset.value = params.get("dataset");
     }
     if (params.has("size")) {
@@ -2109,7 +2129,7 @@ class SortLabApp {
     }
     if (params.get("race") === "1") {
       dom.raceMode.checked = true;
-      if (params.has("raceAlgo") && ALGORITHM_PROFILES[params.get("raceAlgo")]) {
+      if (params.has("raceAlgo") && Object.hasOwn(ALGORITHM_PROFILES, params.get("raceAlgo"))) {
         dom.algorithmRace.value = params.get("raceAlgo");
       }
     }
@@ -2353,6 +2373,15 @@ class SortLabApp {
         ]);
       } else {
         await this.primary.run(algoPrimary);
+      }
+
+      // run() resolves normally after Stop, so check explicitly: an aborted run
+      // must not be recorded, reported as complete, or quizzed on.
+      if (this.primary.stopped || (racing && this.secondary.stopped)) {
+        this.setStatus("Sort stopped");
+        this.announce("Sort stopped.");
+        this.updateProfile();
+        return;
       }
 
       this.recordRun({
@@ -2600,13 +2629,13 @@ class SortLabApp {
     this.lastRunSummary = entry;
     this.history.unshift(entry);
     this.history = this.history.slice(0, MAX_HISTORY);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(this.history));
+    store.set(HISTORY_KEY, JSON.stringify(this.history));
     this.renderHistory();
   }
 
   loadHistory() {
     try {
-      const raw = localStorage.getItem(HISTORY_KEY);
+      const raw = store.get(HISTORY_KEY);
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -2768,7 +2797,7 @@ class SortLabApp {
     document.documentElement.setAttribute("data-theme", next);
     dom.themeToggle.textContent = next === "dark" ? "☀️" : "🌙";
     dom.themeToggle.setAttribute("aria-pressed", next === "dark");
-    localStorage.setItem("theme", next);
+    store.set("theme", next);
     this.opsChart.draw();
     this.primary.renderHeatmap();
     this.secondary.renderHeatmap();

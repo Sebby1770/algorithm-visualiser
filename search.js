@@ -122,6 +122,25 @@ const MAX_HISTORY = 8;
 
 const $ = (id) => document.getElementById(id);
 
+// localStorage throws when site data is blocked (or quota is full); the lab
+// must still load and run, so every read/write goes through these guards.
+const store = {
+  get(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* storage unavailable — keep going without persistence */
+    }
+  },
+};
+
 const dom = {
   algorithm: $("algorithm"),
   dataset: $("dataset"),
@@ -194,7 +213,7 @@ function yesNo(value) {
 
 class AudioManager {
   constructor() {
-    this.enabled = localStorage.getItem("sound") === "true";
+    this.enabled = store.get("sound") === "true";
     this.ctx = null;
   }
 
@@ -227,7 +246,7 @@ class AudioManager {
 
   setEnabled(enabled) {
     this.enabled = enabled;
-    localStorage.setItem("sound", String(enabled));
+    store.set("sound", String(enabled));
   }
 }
 
@@ -310,6 +329,17 @@ class SearchRunner {
         if (i < lo || i > hi) this.elim[i] = true;
       }
     }
+    this.paint();
+  }
+
+  /**
+   * Highlights the block under inspection while it is still provisional:
+   * only indices before lo are ruled out, nothing past hi is greyed yet.
+   */
+  setWindow(lo, hi) {
+    this.lo = lo;
+    this.hi = hi;
+    for (let i = 0; i < lo && i < this.array.length; i++) this.elim[i] = true;
     this.paint();
   }
 
@@ -477,7 +507,7 @@ class SearchRunner {
 
     while (prev < n && a[Math.min(step, n) - 1] < target) {
       const idx = Math.min(step, n) - 1;
-      this.setBounds(prev, Math.min(step, n) - 1);
+      this.setWindow(prev, Math.min(step, n) - 1);
       await this.probe(idx, `Jumping to index ${idx} (${a[idx]}) — still less than ${target}.`);
       this.elim[idx] = true;
       prev = step;
@@ -540,7 +570,7 @@ class SearchRunner {
 
     let bound = 1;
     while (bound < n && a[bound] < target) {
-      this.setBounds(Math.floor(bound / 2), Math.min(bound, n - 1));
+      this.setWindow(Math.floor(bound / 2), Math.min(bound, n - 1));
       await this.probe(bound, `Bound ${bound} is ${a[bound]} — still less than ${target}, double it.`);
       bound *= 2;
     }
@@ -680,7 +710,7 @@ class SearchLabApp {
   }
 
   initTheme() {
-    const saved = localStorage.getItem("theme") || "dark";
+    const saved = store.get("theme") || "dark";
     document.documentElement.setAttribute("data-theme", saved);
     dom.themeToggle.textContent = saved === "dark" ? "☀️" : "🌙";
     dom.themeToggle.setAttribute("aria-pressed", saved === "dark");
@@ -802,7 +832,7 @@ class SearchLabApp {
   toggleTheme() {
     const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
     document.documentElement.setAttribute("data-theme", next);
-    localStorage.setItem("theme", next);
+    store.set("theme", next);
     dom.themeToggle.textContent = next === "dark" ? "☀️" : "🌙";
   }
 
@@ -955,7 +985,10 @@ class SearchLabApp {
   }
 
   getTarget() {
-    const n = Number(dom.target.value);
+    // Number("") is 0, so a blank (or browser-rejected) field must be caught first.
+    const raw = String(dom.target.value).trim();
+    if (!raw || (dom.target.validity && dom.target.validity.badInput)) return null;
+    const n = Number(raw);
     return Number.isFinite(n) ? n : null;
   }
 
@@ -1129,7 +1162,7 @@ class SearchLabApp {
 
   loadHistory() {
     try {
-      const raw = localStorage.getItem(HISTORY_KEY);
+      const raw = store.get(HISTORY_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) ? parsed.slice(0, MAX_HISTORY) : [];
     } catch {
@@ -1140,7 +1173,7 @@ class SearchLabApp {
   recordRun(run) {
     this.history.unshift(run);
     this.history = this.history.slice(0, MAX_HISTORY);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(this.history));
+    store.set(HISTORY_KEY, JSON.stringify(this.history));
     this.renderHistory();
   }
 
@@ -1190,7 +1223,7 @@ class SearchLabApp {
 
   loadFromUrl() {
     const params = new URLSearchParams(window.location.search);
-    if (params.has("algo") && ALGORITHM_PROFILES[params.get("algo")]) {
+    if (params.has("algo") && Object.hasOwn(ALGORITHM_PROFILES, params.get("algo"))) {
       dom.algorithm.value = params.get("algo");
     }
     if (params.has("n")) {
