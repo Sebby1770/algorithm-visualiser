@@ -167,6 +167,25 @@ const MAX_HISTORY = 8;
 
 const $ = (id) => document.getElementById(id);
 
+// localStorage throws when site data is blocked (or quota is full); the lab
+// must still load and run, so every read/write goes through these guards.
+const store = {
+  get(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* storage unavailable — keep going without persistence */
+    }
+  },
+};
+
 const dom = {
   algorithm: $("algorithm"),
   algorithmRace: $("algorithmRace"),
@@ -241,7 +260,7 @@ function yesNo(value) {
 
 class AudioManager {
   constructor() {
-    this.enabled = localStorage.getItem("sound") === "true";
+    this.enabled = store.get("sound") === "true";
     this.ctx = null;
   }
 
@@ -276,7 +295,7 @@ class AudioManager {
 
   setEnabled(enabled) {
     this.enabled = enabled;
-    localStorage.setItem("sound", String(enabled));
+    store.set("sound", String(enabled));
   }
 }
 
@@ -484,7 +503,7 @@ class PathLabApp {
   }
 
   initTheme() {
-    const saved = localStorage.getItem("theme") || "dark";
+    const saved = store.get("theme") || "dark";
     document.documentElement.setAttribute("data-theme", saved);
     dom.themeToggle.textContent = saved === "dark" ? "☀️" : "🌙";
     dom.themeToggle.setAttribute("aria-pressed", saved === "dark");
@@ -1166,6 +1185,7 @@ class PathLabApp {
       algorithm,
       name: profile.name,
       found: !!result.found,
+      capped: !!result.capped,
       nodesExpanded: result.nodesExpanded,
       pathLength: result.path.length,
       pathCost: result.found ? result.pathCost : null,
@@ -1236,6 +1256,8 @@ class PathLabApp {
         ? racing
           ? "Race complete"
           : "Path found"
+        : resultA.capped
+        ? "IDA* gave up after 20,000 expansions"
         : "No path found";
       this.setStatus(done);
       this.announce(done + ".");
@@ -1243,6 +1265,8 @@ class PathLabApp {
         this.setTeaching(
           resultA.found
             ? `Done. Path length ${resultA.path.length}, cost ${resultA.pathCost}, expanded ${resultA.nodesExpanded}.`
+            : resultA.capped
+            ? "IDA* hit its 20,000-expansion safety cap. Each deeper pass re-explores the same cells, so this does not prove the end is unreachable — try A*, which remembers what it has visited."
             : "Search finished — the end is unreachable from the start."
         );
       }
@@ -1412,7 +1436,7 @@ class PathLabApp {
                 <tr class="${rankClass}">
                   <td>${i + 1}</td>
                   <td>${r.name}</td>
-                  <td>${r.found ? "Yes" : "No"}</td>
+                  <td>${r.found ? "Yes" : r.capped ? "Gave up (cap)" : "No"}</td>
                   <td>${cost}</td>
                   <td>${r.nodesExpanded}</td>
                   <td>${r.elapsedMs}</td>
@@ -1444,13 +1468,13 @@ class PathLabApp {
   recordRun(entry) {
     this.history.unshift(entry);
     this.history = this.history.slice(0, MAX_HISTORY);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(this.history));
+    store.set(HISTORY_KEY, JSON.stringify(this.history));
     this.renderHistory();
   }
 
   loadHistory() {
     try {
-      const raw = localStorage.getItem(HISTORY_KEY);
+      const raw = store.get(HISTORY_KEY);
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -1519,10 +1543,10 @@ class PathLabApp {
     const params = new URLSearchParams(window.location.search);
     if (!params.toString()) return;
 
-    if (params.has("algo") && ALGORITHM_PROFILES[params.get("algo")]) {
+    if (params.has("algo") && Object.hasOwn(ALGORITHM_PROFILES, params.get("algo"))) {
       dom.algorithm.value = params.get("algo");
     }
-    if (params.has("maze") && MAZE_LABELS[params.get("maze")]) {
+    if (params.has("maze") && Object.hasOwn(MAZE_LABELS, params.get("maze"))) {
       dom.maze.value = params.get("maze");
     }
     if (params.has("rows")) {
@@ -1541,7 +1565,7 @@ class PathLabApp {
     if (diag === "1" || diag === "true") dom.diagonal.checked = true;
     if (params.get("race") === "1") {
       dom.raceMode.checked = true;
-      if (params.has("raceAlgo") && ALGORITHM_PROFILES[params.get("raceAlgo")]) {
+      if (params.has("raceAlgo") && Object.hasOwn(ALGORITHM_PROFILES, params.get("raceAlgo"))) {
         dom.algorithmRace.value = params.get("raceAlgo");
       }
     }
@@ -1576,7 +1600,7 @@ class PathLabApp {
     document.documentElement.setAttribute("data-theme", next);
     dom.themeToggle.textContent = next === "dark" ? "☀️" : "🌙";
     dom.themeToggle.setAttribute("aria-pressed", next === "dark");
-    localStorage.setItem("theme", next);
+    store.set("theme", next);
   }
 
   setStatus(message) {

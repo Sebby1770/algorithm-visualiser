@@ -6,6 +6,11 @@
   <meta name="description" content="Algo Lab — interactive sorting visualizer with 16 algorithms, race mode, teaching mode, tournaments, plus pathfinding and search labs." />
   <meta name="theme-color" content="#0b1220" />
   <title>Algo Lab — Sorting Visualizer</title>
+  <script>
+    // Apply the saved theme before first paint; the lab script keeps it in sync afterwards.
+    try { document.documentElement.setAttribute("data-theme", localStorage.getItem("theme") || "dark"); }
+    catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+  </script>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -25,6 +30,8 @@
           <a class="lab-pill is-active" href="index.html" aria-current="page">Sort Lab</a>
           <a class="lab-pill" href="pathfinding.html">Path Lab</a>
           <a class="lab-pill" href="search.html">Search Lab</a>
+          <a class="lab-pill" href="database.html">DB Lab</a>
+          <a class="lab-pill" href="hypervisor.html">Hypervisor Lab</a>
         </nav>
       </div>
       <div class="topbar-actions">

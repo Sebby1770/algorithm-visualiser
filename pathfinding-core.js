@@ -188,6 +188,7 @@
       algorithm,
     };
     if (extra && extra.scores) result.scores = extra.scores;
+    if (extra && extra.capped) result.capped = true;
     return result;
   }
 
@@ -791,12 +792,17 @@
       if (res.status === "found") {
         return finish("idaStar", grid, true, reconstructPath(res.cameFrom, end, start), visitedOrder, frontierPeak);
       }
-      if (res.status === "fail" || res.status === "cap") {
+      if (res.status === "fail") {
         return finish("idaStar", grid, false, [], visitedOrder, frontierPeak);
+      }
+      // Hitting the safety cap is not proof that the end is unreachable:
+      // IDA* re-explores cells on every deeper pass. Say so explicitly.
+      if (res.status === "cap") {
+        return finish("idaStar", grid, false, [], visitedOrder, frontierPeak, { capped: true });
       }
       bound = res.bound;
     }
-    return finish("idaStar", grid, false, [], visitedOrder, frontierPeak);
+    return finish("idaStar", grid, false, [], visitedOrder, frontierPeak, { capped: true });
   }
 
   const SEARCH = {
@@ -960,19 +966,23 @@
 
   /**
    * Recursive division. Returns a NEW empty grid with added walls.
-   * One gap per dividing wall keeps the open cells connected.
+   * Dividing walls sit only on odd rows/columns and their single gap only on
+   * an even index. A later wall is always on an odd line, so it can never
+   * cover an earlier gap (or the even cells either side of it) — every open
+   * cell, start and end included, stays connected.
    */
   function mazeRecursiveDivision(rows, cols, rng) {
     rng = rngFn(rng);
     const grid = makeGrid(rows, cols);
 
+    // Chambers always start on an even row/column.
     function divide(r, c, h, w) {
       if (h < 3 || w < 3) return;
       const horizontal = h > w || (h === w && rng() >= 0.5);
 
       if (horizontal) {
-        const wr = r + 1 + randInt(rng, h - 2);
-        const gap = c + randInt(rng, w);
+        const wr = r + 1 + 2 * randInt(rng, Math.floor((h - 1) / 2));
+        const gap = c + 2 * randInt(rng, Math.ceil(w / 2));
         for (let x = c; x < c + w; x++) {
           if (x !== gap) {
             grid[wr][x].type = "wall";
@@ -982,8 +992,8 @@
         divide(r, c, wr - r, w);
         divide(wr + 1, c, r + h - wr - 1, w);
       } else {
-        const wc = c + 1 + randInt(rng, w - 2);
-        const gap = r + randInt(rng, h);
+        const wc = c + 1 + 2 * randInt(rng, Math.floor((w - 1) / 2));
+        const gap = r + 2 * randInt(rng, Math.ceil(h / 2));
         for (let y = r; y < r + h; y++) {
           if (y !== gap) {
             grid[y][wc].type = "wall";

@@ -57,7 +57,7 @@ const ALGORITHM_PROFILES = {
     worst: "O(n²)",
     stable: false,
     inPlace: true,
-    memory: "O(log n)",
+    memory: "O(log n) avg, O(n) worst",
     description: "Partitions around a pivot, then recursively sorts sub-arrays.",
   },
   heap: {
@@ -142,7 +142,7 @@ const ALGORITHM_PROFILES = {
   },
   pancake: {
     name: "Pancake Sort",
-    best: "O(n)",
+    best: "O(n²)",
     avg: "O(n²)",
     worst: "O(n²)",
     stable: false,
@@ -178,11 +178,11 @@ const LEARNING_CARDS = {
     useCase: "Educational demos and tiny embedded lists where code size matters more than speed.",
   },
   selection: {
-    trivia: "Selection sort always makes exactly n−1 swaps, no matter the input order.",
+    trivia: "Selection sort makes at most n−1 swaps — the fewest of the simple sorts — because each pass moves one element into its final place (and skips the swap if it is already there).",
     useCase: "Flash memory systems where writes are expensive and minimizing swaps is critical.",
   },
   insertion: {
-    trivia: "Insertion sort is the algorithm behind Timsort's galloping merge for nearly-sorted runs.",
+    trivia: "Timsort uses insertion sort to extend short runs to its minimum run length before merging — it is that fast on small or nearly-sorted data.",
     useCase: "Real-time online sorting — e.g. sorting a hand of playing cards as you receive them.",
   },
   merge: {
@@ -191,7 +191,7 @@ const LEARNING_CARDS = {
   },
   quick: {
     trivia: "Tony Hoare invented Quick Sort at age 26 while on an exchange program in Moscow.",
-    useCase: "General-purpose in-memory sorting — used in C's qsort, Python's Timsort hybrid, and more.",
+    useCase: "General-purpose in-memory sorting — C's qsort, C++'s std::sort (introsort) and Java's sort for primitive arrays all build on quicksort.",
   },
   heap: {
     trivia: "Heap sort guarantees O(n log n) without extra arrays — unlike merge sort.",
@@ -255,6 +255,25 @@ const MAX_HISTORY = 8;
 
 // ---------- DOM references ----------
 const $ = (id) => document.getElementById(id);
+
+// localStorage throws when site data is blocked (or quota is full); the lab
+// must still load and run, so every read/write goes through these guards.
+const store = {
+  get(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key, value) {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      /* storage unavailable — keep going without persistence */
+    }
+  },
+};
 
 function isTypingTarget(el) {
   if (!el || !el.tagName) return false;
@@ -514,12 +533,29 @@ function parseCustomArray(input, maxSize = 120) {
     return { error: "All values must be valid numbers." };
   }
 
+  // Bars are drawn with the values as heights (%), and counting / radix sort
+  // need small non-negative integers, so other inputs are mapped onto 10–95.
+  // The mapping must never merge two different numbers or change their order,
+  // or the lab would sort different data from what was typed.
+  if (values.every((v) => Number.isInteger(v) && v >= 1 && v <= 100)) {
+    return { data: values.slice(), original: values, labels: null, rescaled: false };
+  }
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-  const normalized = values.map((v) => Math.round(((v - min) / range) * 85 + 10));
-
-  return { data: normalized, original: values };
+  const distinct = [...new Set(values)].sort((a, b) => a - b);
+  const linear = (v) => Math.round(((v - min) / range) * 85 + 10);
+  let scale = linear;
+  if (new Set(distinct.map(linear)).size !== distinct.length) {
+    // Proportional heights would merge nearby values: space them by rank instead.
+    const step = distinct.length > 1 ? 85 / (distinct.length - 1) : 0;
+    const rank = new Map(distinct.map((v, i) => [v, Math.round(10 + i * step)]));
+    scale = (v) => rank.get(v);
+  }
+  const data = values.map(scale);
+  const labels = new Map(values.map((v, i) => [data[i], v]));
+  const collisions = new Set(data).size !== distinct.length;
+  return { data, original: values, labels, rescaled: true, collisions };
 }
 
 // ---------- Operations sparkline chart ----------
@@ -598,7 +634,7 @@ class OperationsChart {
 // ---------- Audio ----------
 class AudioManager {
   constructor() {
-    this.enabled = localStorage.getItem("sound") === "true";
+    this.enabled = store.get("sound") === "true";
     this.ctx = null;
   }
 
@@ -639,7 +675,7 @@ class AudioManager {
 
   setEnabled(enabled) {
     this.enabled = enabled;
-    localStorage.setItem("sound", String(enabled));
+    store.set("sound", String(enabled));
   }
 }
 
@@ -679,6 +715,7 @@ class SortRunner {
     this.bars = [];
     this.accessCounts = [];
     this.identityColors = false;
+    this.valueLabels = null; // bar height → the number the user typed (custom input)
     this.metrics = new Metrics();
     this.paused = false;
     this.stopped = false;
@@ -739,7 +776,10 @@ class SortRunner {
     if (!bar) return;
     const value = this.array[i];
     bar.style.height = `${value}%`;
-    if (this.array.length <= 24) bar.textContent = String(value);
+    if (this.array.length <= 24) {
+      const shown = this.valueLabels && this.valueLabels.has(value) ? this.valueLabels.get(value) : value;
+      bar.textContent = String(shown);
+    }
     else bar.textContent = "";
     if (this.identityColors) {
       bar.style.setProperty("--bar-identity", this.identityHue(this.ids[i]));
@@ -1315,8 +1355,9 @@ class SortRunner {
       const bucket = this.array[i] - min;
       this.trackAccess(i);
       if (!this.silent) this.bars[i]?.classList.add("bucket");
+      // Tallies are bookkeeping, not array writes — SortCore.counting (and the
+      // tournament) count only the n output writes, so the live metric matches.
       count[bucket]++;
-      this.metrics.writes++;
       this.onCountingArrayUpdate?.(count, min, max, bucket);
       this.narrate(`Incrementing count for value ${this.array[i]} (bucket ${bucket}).`);
       this.recordOperation();
@@ -1721,7 +1762,7 @@ class SortLabApp {
   }
 
   initTheme() {
-    const saved = localStorage.getItem("theme") || "dark";
+    const saved = store.get("theme") || "dark";
     document.documentElement.setAttribute("data-theme", saved);
     dom.themeToggle.textContent = saved === "dark" ? "☀️" : "🌙";
     dom.themeToggle.setAttribute("aria-pressed", saved === "dark");
@@ -1899,6 +1940,8 @@ class SortLabApp {
 
     this.showCustomError("");
     this.baseArray = result.data;
+    this.primary.valueLabels = result.labels;
+    this.secondary.valueLabels = result.labels;
     dom.size.value = result.data.length;
     dom.sizeValue.textContent = result.data.length;
     this.primary.identityColors = this.identityColorsEnabled();
@@ -1911,7 +1954,12 @@ class SortLabApp {
     this.secondary.updateMetricsDisplay();
     this.updateRecommender();
     this.hideCountingArrayPanel();
-    this.setStatus(`Loaded custom array (${result.data.length} elements)`);
+    const scaleNote = !result.rescaled
+      ? ""
+      : result.collisions
+      ? " — rescaled to bar heights; more than 86 distinct values, so some neighbours share a height"
+      : " — rescaled to bar heights 10–95 with order preserved; labels show your numbers";
+    this.setStatus(`Loaded custom array (${result.data.length} elements)${scaleNote}`);
     this.announce(`Custom array loaded with ${result.data.length} elements.`);
   }
 
@@ -1926,6 +1974,8 @@ class SortLabApp {
     const type = dom.dataset.value;
     const size = this.getSize();
     this.baseArray = generateDataset(type, size);
+    this.primary.valueLabels = null;
+    this.secondary.valueLabels = null;
     this.primary.identityColors = this.identityColorsEnabled();
     this.secondary.identityColors = this.identityColorsEnabled();
     this.primary.setArray(this.baseArray);
@@ -1999,7 +2049,7 @@ class SortLabApp {
 
   loadQuizScore() {
     try {
-      const raw = localStorage.getItem(QUIZ_SCORE_KEY);
+      const raw = store.get(QUIZ_SCORE_KEY);
       return raw ? JSON.parse(raw) : { correct: 0, total: 0 };
     } catch {
       return { correct: 0, total: 0 };
@@ -2007,7 +2057,7 @@ class SortLabApp {
   }
 
   saveQuizScore() {
-    localStorage.setItem(QUIZ_SCORE_KEY, JSON.stringify(this.quizScore));
+    store.set(QUIZ_SCORE_KEY, JSON.stringify(this.quizScore));
     this.updateQuizScoreDisplay();
   }
 
@@ -2093,10 +2143,10 @@ class SortLabApp {
     const params = new URLSearchParams(window.location.search);
     if (!params.toString()) return;
 
-    if (params.has("algo") && ALGORITHM_PROFILES[params.get("algo")]) {
+    if (params.has("algo") && Object.hasOwn(ALGORITHM_PROFILES, params.get("algo"))) {
       dom.algorithm.value = params.get("algo");
     }
-    if (params.has("dataset") && DATASET_LABELS[params.get("dataset")]) {
+    if (params.has("dataset") && Object.hasOwn(DATASET_LABELS, params.get("dataset"))) {
       dom.dataset.value = params.get("dataset");
     }
     if (params.has("size")) {
@@ -2109,7 +2159,7 @@ class SortLabApp {
     }
     if (params.get("race") === "1") {
       dom.raceMode.checked = true;
-      if (params.has("raceAlgo") && ALGORITHM_PROFILES[params.get("raceAlgo")]) {
+      if (params.has("raceAlgo") && Object.hasOwn(ALGORITHM_PROFILES, params.get("raceAlgo"))) {
         dom.algorithmRace.value = params.get("raceAlgo");
       }
     }
@@ -2353,6 +2403,15 @@ class SortLabApp {
         ]);
       } else {
         await this.primary.run(algoPrimary);
+      }
+
+      // run() resolves normally after Stop, so check explicitly: an aborted run
+      // must not be recorded, reported as complete, or quizzed on.
+      if (this.primary.stopped || (racing && this.secondary.stopped)) {
+        this.setStatus("Sort stopped");
+        this.announce("Sort stopped.");
+        this.updateProfile();
+        return;
       }
 
       this.recordRun({
@@ -2600,13 +2659,13 @@ class SortLabApp {
     this.lastRunSummary = entry;
     this.history.unshift(entry);
     this.history = this.history.slice(0, MAX_HISTORY);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(this.history));
+    store.set(HISTORY_KEY, JSON.stringify(this.history));
     this.renderHistory();
   }
 
   loadHistory() {
     try {
-      const raw = localStorage.getItem(HISTORY_KEY);
+      const raw = store.get(HISTORY_KEY);
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -2768,7 +2827,7 @@ class SortLabApp {
     document.documentElement.setAttribute("data-theme", next);
     dom.themeToggle.textContent = next === "dark" ? "☀️" : "🌙";
     dom.themeToggle.setAttribute("aria-pressed", next === "dark");
-    localStorage.setItem("theme", next);
+    store.set("theme", next);
     this.opsChart.draw();
     this.primary.renderHeatmap();
     this.secondary.renderHeatmap();
