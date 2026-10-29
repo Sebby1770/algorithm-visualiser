@@ -509,3 +509,40 @@ test("events describe buffer pool, B+ tree and WAL activity", () => {
   assert.deepEqual(snap.tables[0].indexes[0].tree.root.startsWith("n"), true);
   assert.equal(JSON.parse(JSON.stringify(snap)).bufferPool.frames.length, 3, "snapshot is JSON-safe");
 });
+
+// ---------- Review regressions ----------
+
+test("ORDER BY / GROUP BY positions count the columns a * expands to", () => {
+  const db = fresh();
+  run(db, "CREATE TABLE t (id INT PRIMARY KEY, g TEXT, v INT); INSERT INTO t VALUES (1, 'a', 5), (2, 'b', 9), (3, 'c', 7)");
+  assert.deepEqual(rows(db, "SELECT * FROM t ORDER BY 3 DESC").map((r) => r[0]), [2, 3, 1]);
+  assert.deepEqual(rows(db, "SELECT t.* FROM t ORDER BY 1 DESC").map((r) => r[0]), [3, 2, 1]);
+  assert.deepEqual(rows(db, "SELECT v, * FROM t ORDER BY 3").map((r) => r[2]), ["a", "b", "c"], "position 3 is g, after v and id");
+  assert.match(errorOf(db, "SELECT * FROM t ORDER BY 4").message, /out of range/);
+});
+
+test("ROUND rounds halves away from zero on both sides", () => {
+  const db = fresh();
+  assert.deepEqual(rows(db, "SELECT ROUND(-2.5), ROUND(2.5), ROUND(-0.5), ROUND(-1.25, 1), ROUND(0.4), ROUND(-0.4)"), [[-3, 3, -1, -1.3, 0, 0]]);
+});
+
+test("redo events carry the row they write, so a viewer can replay recovery exactly", () => {
+  const db = fresh();
+  run(db, "CREATE TABLE t (id INT PRIMARY KEY, v INT); INSERT INTO t VALUES (1, 10), (2, 20)");
+  db.crash();
+  const { events } = db.recover();
+  const redone = events.filter((e) => e.type === "recovery" && e.phase === "redo" && e.applied);
+  assert.ok(redone.length >= 2);
+  for (const e of redone) assert.ok(Array.isArray(e.values) || e.values === null, "redo event has values");
+  assert.deepEqual(redone.find((e) => e.rid === "t#0:1").values, [2, 20]);
+});
+
+test("btree-state events describe their index, so a new index can be drawn while it is built", () => {
+  const db = fresh();
+  run(db, "CREATE TABLE t (id INT PRIMARY KEY, v INT); INSERT INTO t VALUES (1, 10), (2, 20), (3, 30)");
+  const [res] = db.execute("CREATE INDEX idx_v ON t (v)");
+  const states = res.events.filter((e) => e.type === "btree-state" && e.index === "idx_v");
+  assert.equal(states.length, 3);
+  assert.deepEqual([states[0].table, states[0].column, states[0].unique], ["t", "v", false]);
+  assert.equal(states[2].tree.size, 3);
+});

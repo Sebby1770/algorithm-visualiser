@@ -439,9 +439,41 @@ function applyEvent(model, hl, ev) {
       break;
     }
     case "btree-state": {
-      const entry = model.trees.get(ev.index);
+      let entry = model.trees.get(ev.index);
+      if (!entry && ev.table) {
+        // CREATE INDEX: the index didn't exist when this statement started.
+        entry = { table: ev.table, column: ev.column, unique: ev.unique, tree: null };
+        model.trees.set(ev.index, entry);
+        touched.add("tree-new");
+      }
       if (entry) entry.tree = ev.tree;
       touched.add("tree");
+      break;
+    }
+    case "ddl":
+      if (ev.action === "create-table" && !model.tables.some((t) => t.name === ev.table)) {
+        model.tables.push({ name: ev.table, columns: ev.columns || [], rowCount: 0, pages: [], indexes: [] });
+        for (const idx of ev.indexes || []) model.trees.set(idx.name, { table: ev.table, column: idx.column, unique: idx.unique, tree: idx.tree });
+        touched.add("heap").add("tree").add("stats");
+      } else if (ev.action === "drop-table") {
+        model.tables = model.tables.filter((t) => t.name !== ev.table);
+        for (const [name, entry] of model.trees) if (entry.table === ev.table) model.trees.delete(name);
+        touched.add("heap").add("tree").add("stats");
+      }
+      break;
+    case "recovery": {
+      // Redo writes rows straight into pages; mirror it so the heap pane moves too.
+      if (ev.phase !== "redo" || !ev.applied || !ev.rid) break;
+      const pageId = pageOf(ev.rid);
+      const page = findPage(model, pageId);
+      if (!page) break;
+      const slot = slotOf(ev.rid);
+      while (page.slots.length <= slot) page.slots.push({ slot: page.slots.length, rid: `${pageId}:${page.slots.length}`, values: null, deleted: true });
+      page.slots[slot] = { slot, rid: ev.rid, values: ev.values, deleted: !ev.values };
+      page.pageLSN = ev.lsn;
+      hl.pages.add(pageId);
+      hl.slots.set(ev.rid, "is-written");
+      touched.add("heap");
       break;
     }
     case "operator":
@@ -1227,6 +1259,7 @@ class DbLabApp {
       if (isPoolEvent) this.hl.frames.clear();
       const touched = applyEvent(this.model, this.hl, ev);
       if (onEvent) onEvent(ev);
+      if (touched.has("tree-new")) this.selectedIndex = ev.index;
       const text = narrate(ev, this.model.pool.policy);
       const visible = text !== null || (ev.type === "btree" && ev.event.type === "visit") || (ev.type === "row" && ev.op === "scan");
       if (ev.type === "btree" && ev.event.type !== "visit") this.selectedIndex = this.selectedIndex || ev.index;

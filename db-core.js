@@ -1640,7 +1640,9 @@
             if (v === null || digits === null) return null;
             numericOperands("ROUND()", v, digits);
             const f = Math.pow(10, digits);
-            return Math.round(v * f) / f;
+            // Half away from zero, symmetrically: ROUND(-2.5) = -3 like ROUND(2.5) = 3.
+            const r = Math.round(Math.abs(v) * f) / f;
+            return v < 0 && r !== 0 ? -r : r;
           },
           type: "REAL",
         };
@@ -1796,7 +1798,9 @@
      * show every intermediate state (skipped for big trees to keep traces small).
      */
     emitTreeState(idx) {
-      if (this.sink && idx.tree && idx.tree.size <= 200) this.emit({ type: "btree-state", index: idx.name, tree: idx.tree.snapshot() });
+      if (this.sink && idx.tree && idx.tree.size <= 200) {
+        this.emit({ type: "btree-state", index: idx.name, table: idx.table, column: idx.column, unique: idx.unique, tree: idx.tree.snapshot() });
+      }
     }
 
     // ----- disk -----
@@ -1910,7 +1914,7 @@
       if (this.indexOwner.has(name)) throw new DbError(`index ${name} already exists`);
       const colIndex = table.columns.findIndex((c) => c.name === column);
       if (colIndex < 0) throw new DbError(`no such column: ${table.name}.${column}`);
-      const idx = { name, column, colIndex, unique, tree: null };
+      const idx = { name, table: table.name, column, colIndex, unique, tree: null };
       try {
         this.buildIndex(table, idx);
       } catch (err) {
@@ -2274,7 +2278,13 @@
         });
         throw err;
       }
-      this.emit({ type: "ddl", action: "create-table", table: table.name });
+      this.emit({
+        type: "ddl",
+        action: "create-table",
+        table: table.name,
+        columns: table.columns.map((c) => ({ name: c.name, type: c.type, primaryKey: !!c.primaryKey, notNull: !!c.notNull, unique: !!(c.unique || c.primaryKey) })),
+        indexes: table.indexes.map((idx) => ({ name: idx.name, column: idx.column, unique: idx.unique, tree: idx.tree.snapshot() })),
+      });
       const note = table.indexes.length ? ` + ${table.indexes.map((i) => i.name).join(", ")}` : "";
       return { message: `created table ${table.name} (${plural(table.columns.length, "column")})${note}` };
     }
@@ -2946,9 +2956,17 @@
         node = this.filterNode(node, whereConjs, scope);
       }
       const baseScope = scope;
+      // Positions count output columns, so a * contributes one per column it expands to.
+      const outputItems = ast.columns.flatMap((item) =>
+        item.star
+          ? baseScope.columns
+              .filter((c) => !item.table || c.table === item.table)
+              .map((c) => ({ expr: { type: "column", table: c.table, name: c.name, pos: null } }))
+          : [item]
+      );
       const selectExprAt = (n, clause) => {
-        const item = ast.columns[n - 1];
-        if (!item || item.star) throw new DbError(`${clause} position ${n} is not a selected expression`);
+        const item = outputItems[n - 1];
+        if (!item) throw new DbError(`${clause} position ${n} is out of range (${outputItems.length} output columns)`);
         return item.expr;
       };
       const aliasItem = (e) => (e.type === "column" && !e.table ? ast.columns.find((c) => !c.star && c.alias === e.name) : null);
@@ -3133,6 +3151,7 @@
             txn: r.txn,
             rid: r.rid,
             applied: apply,
+            values: apply && r.after ? r.after.slice() : null,
             detail: apply
               ? `redo LSN ${r.lsn} (${r.type}) on ${pageId}: pageLSN ${pageLSN} < ${r.lsn}`
               : `skip LSN ${r.lsn}: ${pageId} already has pageLSN ${pageLSN}`,
