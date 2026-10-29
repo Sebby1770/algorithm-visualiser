@@ -17,6 +17,14 @@ All notable changes to Algo Lab (Algorithm Visualizer).
 - **Offline share links:** pages are matched without their query string, so links like `search.html?algo=…` open offline
 - **Theme flash:** the saved theme is applied before first paint on every page
 - Top-bar actions and the lab switcher wrap instead of overflowing on phones; the Sort Lab operations chart no longer overflows its pane at 375 px
+- **Path Lab — Recursive Division** mazes were almost never solvable (later walls sealed earlier gaps; 2 of 100 solvable). Walls now sit on odd lines and gaps on even cells, so every maze is solvable
+- **Path Lab — IDA\*** hitting its 20,000-expansion cap is reported as "gave up", not as "the end is unreachable" (status, narration, tournament)
+- **Sort Lab — Stop** no longer records the aborted run as "Sort complete", adds it to history, or opens the quiz
+- **Sort Lab — custom input** no longer merges distinct values: small integers are kept as typed, other values are rescaled without changing their order, and bar labels show the numbers you entered
+- **Sort Lab — Counting Sort** live write count now matches the tournament's
+- **Sort Lab text:** selection sort makes *at most* n−1 swaps; pancake sort's best case is O(n²) comparisons; quick sort uses O(n) stack in the worst case; corrected the Timsort trivia
+- **Search Lab:** jump and exponential search no longer grey out blocks they haven't reached; a blank target is rejected instead of searching for 0
+- **All labs** keep working when browser storage is blocked or full, and share links such as `?algo=constructor` no longer crash a page
 
 ### Changed
 - Lab switcher lists five labs on every page; README and manifest describe all five

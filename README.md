@@ -58,7 +58,7 @@ CI (`.github/workflows/ci.yml`, Node 20) syntax-checks every browser script with
 | Selection | O(n²) | O(n²) | O(n²) | No | Yes | O(1) |
 | Insertion | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
 | Merge | O(n log n) | O(n log n) | O(n log n) | Yes | No | O(n) |
-| Quick | O(n log n) | O(n log n) | O(n²) | No | Yes | O(log n) |
+| Quick | O(n log n) | O(n log n) | O(n²) | No | Yes | O(log n) avg, O(n) worst |
 | Heap | O(n log n) | O(n log n) | O(n log n) | No | Yes | O(1) |
 | Shell | O(n log n) | O(n^4/3) | O(n²) | No | Yes | O(1) |
 | Radix | O(nk) | O(nk) | O(nk) | Yes | No | O(n + k) |
@@ -67,11 +67,11 @@ CI (`.github/workflows/ci.yml`, Node 20) syntax-checks every browser script with
 | Comb | O(n log n) | O(n² / 2ᵖ) | O(n²) | No | Yes | O(1) |
 | Gnome | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
 | Odd-Even | O(n) | O(n²) | O(n²) | Yes | Yes | O(1) |
-| Pancake | O(n) | O(n²) | O(n²) | No | Yes | O(1) |
+| Pancake | O(n²) | O(n²) | O(n²) | No | Yes | O(1) |
 | Cycle | O(n²) | O(n²) | O(n²) | No | Yes | O(1) |
 | Timsort | O(n) | O(n log n) | O(n log n) | Yes | No | O(n) |
 
-Radix is LSD base 10 (non-negative integers). Comb uses a 1.3 shrink factor. Pancake sorts by prefix reversals. Cycle sort writes each element at most once. Timsort (simplified) finds natural runs, reverses descending runs, insertion-sorts to minrun, then merges pairwise.
+Radix is LSD base 10 (non-negative integers). Comb uses a 1.3 shrink factor. Pancake sorts by prefix reversals (it always scans for the maximum, so even sorted input costs O(n²) comparisons — but zero flips). Cycle sort writes each element at most once. Timsort (simplified) finds natural runs, reverses descending runs, insertion-sorts to minrun, then merges pairwise.
 
 Pure implementations live in `sorting-core.js` (`SortCore` in the browser / `module.exports` in Node). Visual runs still use `SortRunner` in `script.js`. Silent tournaments use `SortCore` when it is loaded.
 
