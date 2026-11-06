@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Algo Lab — DB Lab: a working SQL database engine you can watch. B+ tree indexes, LRU / Clock buffer pool, cost-based query planner, write-ahead log, and ARIES crash recovery, step by step." />
+  <meta name="theme-color" content="#0b1220" />
+  <title>Algo Lab — Database Engine Visualizer</title>
+  <script>
+    // Apply the saved theme before first paint; the lab script keeps it in sync afterwards.
+    try { document.documentElement.setAttribute("data-theme", localStorage.getItem("theme") || "dark"); }
+    catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+  </script>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="database.css" />
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to lab</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-start">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">⚗</span>
+          <div>
+            <h1>Algo Lab</h1>
+            <p class="brand-sub">Database Engine Visualizer</p>
+          </div>
+        </div>
+        <nav class="lab-switcher" aria-label="Choose a lab">
+          <a class="lab-pill" href="index.html">Sort Lab</a>
+          <a class="lab-pill" href="pathfinding.html">Path Lab</a>
+          <a class="lab-pill" href="search.html">Search Lab</a>
+          <a class="lab-pill is-active" href="database.html" aria-current="page">DB Lab</a>
+          <a class="lab-pill" href="hypervisor.html">Hypervisor Lab</a>
+        </nav>
+      </div>
+      <div class="topbar-actions">
+        <button id="shareUrlBtn" class="btn btn-ghost btn-sm" type="button" title="Copy a link to this script">🔗 Share</button>
+        <label class="toggle-pill" title="Sound effects on buffer hits and misses">
+          <input type="checkbox" id="soundToggle" aria-label="Toggle sound" />
+          <span>🔊 Sound</span>
+        </label>
+        <button id="cheatSheetBtn" class="icon-btn" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+        <button id="themeToggle" class="icon-btn" type="button" aria-label="Toggle dark mode">🌙</button>
+      </div>
+    </header>
+
+    <div class="workspace" id="workspace">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2 class="panel-title">Engine</h2>
+
+          <div class="field">
+            <label for="frames">Buffer frames: <span id="framesValue">6</span></label>
+            <input type="range" id="frames" min="3" max="16" value="6" />
+          </div>
+
+          <div class="field">
+            <label for="policy">Replacement policy</label>
+            <select id="policy">
+              <option value="lru">LRU — least recently used</option>
+              <option value="clock">Clock — second chance</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="rowsPerPage">Rows per page: <span id="rowsPerPageValue">4</span></label>
+            <input type="range" id="rowsPerPage" min="2" max="8" value="4" />
+          </div>
+
+          <div class="field">
+            <label for="btreeOrder">B+ tree order: <span id="btreeOrderValue">4</span></label>
+            <input type="range" id="btreeOrder" min="3" max="8" value="4" />
+          </div>
+          <p class="field-note">Changing rows per page or tree order rebuilds an empty database.</p>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">Playback</h2>
+
+          <div class="field">
+            <label for="speed">Speed: <span id="speedValue">60</span></label>
+            <input type="range" id="speed" min="1" max="100" value="60" />
+          </div>
+
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="stepMode" />
+              <span>Step Mode (manual advance)</span>
+            </label>
+          </div>
+
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="teachingMode" checked />
+              <span>Teaching Mode (narrated steps)</span>
+            </label>
+          </div>
+
+          <div class="btn-grid">
+            <button id="pauseBtn" class="btn btn-secondary" type="button" disabled title="Shortcut: Space">Pause</button>
+            <button id="stopBtn" class="btn btn-danger" type="button" disabled title="Shortcut: Esc">Stop</button>
+            <button id="nextStepBtn" class="btn btn-accent" type="button" disabled title="Shortcut: N">Next Step</button>
+            <button id="skipBtn" class="btn btn-secondary" type="button" disabled title="Finish the current statement instantly">Skip ⏭</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">Failure &amp; durability</h2>
+          <div class="btn-grid">
+            <button id="crashBtn" class="btn btn-danger" type="button" title="Shortcut: K">⚡ Crash</button>
+            <button id="recoverBtn" class="btn btn-primary" type="button" disabled title="Shortcut: V">Recover</button>
+            <button id="checkpointBtn" class="btn btn-secondary" type="button">Checkpoint</button>
+            <button id="resetDbBtn" class="btn btn-secondary" type="button">Reset DB</button>
+          </div>
+          <p class="field-note">Crash drops everything in memory: buffer frames, unflushed log records and the open transaction.</p>
+        </section>
+
+        <section class="panel" id="statsPanel" aria-live="polite">
+          <h2 class="panel-title">Engine stats</h2>
+          <dl id="engineStats" class="profile-grid"></dl>
+        </section>
+
+        <section class="panel" id="learningCardsPanel">
+          <h2 class="panel-title">Concept Cards</h2>
+          <div class="field">
+            <label for="conceptSelect" class="sr-only">Concept</label>
+            <select id="conceptSelect"></select>
+          </div>
+          <div id="learningCard" class="learning-card" tabindex="0" role="button" aria-label="Flip concept card">
+            <div class="learning-card-inner">
+              <div class="learning-card-front">
+                <span class="learning-card-label" id="conceptTitle">Concept</span>
+                <p id="learningTrivia" class="learning-card-text"></p>
+              </div>
+              <div class="learning-card-back">
+                <span class="learning-card-label">In real systems</span>
+                <p id="learningUseCase" class="learning-card-text"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">Run History</h2>
+          <ul id="historyList" class="history-list"></ul>
+        </section>
+      </aside>
+
+      <main class="main-stage">
+        <p id="statusText" class="status-bar" aria-live="polite" role="status">Ready</p>
+
+        <section id="crashBanner" class="db-crash-banner" hidden aria-live="assertive">
+          <strong id="crashTitle">⚡ The database crashed.</strong>
+          <span id="crashDetail"></span>
+          <ol id="recoverySteps" class="db-recovery-steps" aria-label="Recovery phases">
+            <li data-phase="analysis">Analysis</li>
+            <li data-phase="redo">Redo</li>
+            <li data-phase="undo">Undo</li>
+            <li data-phase="rebuild">Rebuild indexes</li>
+            <li data-phase="done">Done</li>
+          </ol>
+        </section>
+
+        <section id="teachingPanel" class="teaching-panel" aria-labelledby="teachingTitle">
+          <h3 id="teachingTitle" class="teaching-title">Teaching Mode</h3>
+          <p id="teachingText" class="teaching-text" aria-live="polite" aria-atomic="true">Run a script step by step to hear what every layer of the engine is doing.</p>
+        </section>
+
+        <section class="viz-pane db-console">
+          <div class="pane-header">
+            <h3>SQL Console</h3>
+            <div class="db-sample-row">
+              <label for="sampleSelect" class="sr-only">Sample script</label>
+              <select id="sampleSelect" class="db-select"></select>
+              <button id="loadSampleBtn" class="btn btn-ghost btn-sm" type="button" title="Load the sample into the editor (resets the database)">Load</button>
+            </div>
+          </div>
+          <p id="sampleDescription" class="db-sample-desc"></p>
+          <label for="sqlEditor" class="sr-only">SQL script</label>
+          <textarea id="sqlEditor" class="db-editor" spellcheck="false" autocomplete="off" autocapitalize="off" rows="12"></textarea>
+          <div class="db-console-actions">
+            <button id="runBtn" class="btn btn-primary" type="button" title="Ctrl/⌘ + Enter">▶ Run</button>
+            <button id="stepRunBtn" class="btn btn-accent" type="button" title="Animate every engine event">Run step-by-step</button>
+            <button id="clearBtn" class="btn btn-secondary" type="button">Clear results</button>
+            <span class="db-console-hint">Ctrl/⌘ + Enter runs · statements are separated by <code>;</code></span>
+          </div>
+        </section>
+
+        <section class="viz-pane" aria-labelledby="resultsTitle">
+          <div class="pane-header">
+            <h3 id="resultsTitle">Results</h3>
+            <div id="resultsMeta" class="metrics-strip"></div>
+          </div>
+          <div id="results" class="db-results"></div>
+        </section>
+
+        <div class="db-grid">
+          <section class="viz-pane" aria-labelledby="planTitle">
+            <div class="pane-header">
+              <h3 id="planTitle">Query Plan</h3>
+              <div id="planMeta" class="metrics-strip"></div>
+            </div>
+            <div id="planView" class="db-plan"></div>
+          </section>
+
+          <section class="viz-pane" aria-labelledby="treeTitle">
+            <div class="pane-header">
+              <h3 id="treeTitle">B+ Tree</h3>
+              <div class="db-sample-row">
+                <label for="indexSelect" class="sr-only">Index</label>
+                <select id="indexSelect" class="db-select"></select>
+              </div>
+            </div>
+            <div id="treeMeta" class="db-subhead metrics-strip"></div>
+            <div id="treeView" class="db-tree-wrap"></div>
+          </section>
+
+          <section class="viz-pane" aria-labelledby="poolTitle">
+            <div class="pane-header">
+              <h3 id="poolTitle">Buffer Pool</h3>
+              <div id="poolMeta" class="metrics-strip"></div>
+            </div>
+            <div id="poolView" class="db-pool" role="list" aria-label="Buffer pool frames"></div>
+          </section>
+
+          <section class="viz-pane" aria-labelledby="walTitle">
+            <div class="pane-header">
+              <h3 id="walTitle">Write-Ahead Log</h3>
+              <div id="walMeta" class="metrics-strip"></div>
+            </div>
+            <div id="walView" class="db-wal" role="log" aria-label="Write-ahead log records"></div>
+          </section>
+
+          <section class="viz-pane db-grid-wide" aria-labelledby="heapTitle">
+            <div class="pane-header">
+              <h3 id="heapTitle">Heap Pages</h3>
+              <div id="heapMeta" class="metrics-strip"></div>
+            </div>
+            <div id="heapView" class="db-heap"></div>
+          </section>
+        </div>
+
+        <section class="legend" id="legend">
+          <div class="legend-item"><span class="swatch db-sw-visit"></span> Visited / read</div>
+          <div class="legend-item"><span class="swatch db-sw-hit"></span> Buffer hit</div>
+          <div class="legend-item"><span class="swatch db-sw-miss"></span> Miss / new</div>
+          <div class="legend-item"><span class="swatch db-sw-evict"></span> Evicted / undo</div>
+          <div class="legend-item"><span class="swatch db-sw-write"></span> Write / split</div>
+          <div class="legend-item"><span class="swatch db-sw-dirty"></span> Dirty page</div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="cheatSheet" class="cheat-sheet" aria-labelledby="cheatSheetTitle">
+    <div class="cheat-sheet-header">
+      <h2 id="cheatSheetTitle">Keyboard shortcuts</h2>
+      <button type="button" id="cheatSheetClose" class="icon-btn" aria-label="Close cheat sheet">×</button>
+    </div>
+    <ul class="cheat-sheet-list">
+      <li><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> Run the script (works in the editor)</li>
+      <li><kbd>Space</kbd> Pause / resume playback</li>
+      <li><kbd>N</kbd> Next step (Step Mode)</li>
+      <li><kbd>Esc</kbd> Stop playback</li>
+      <li><kbd>K</kbd> Crash the database</li>
+      <li><kbd>V</kbd> Run recovery</li>
+      <li><kbd>?</kbd> Toggle this cheat sheet</li>
+    </ul>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="a11yAnnouncer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+  <script src="lab-common.js"></script>
+  <script src="db-core.js"></script>
+  <script src="database.js"></script>
+</body>
+</html>

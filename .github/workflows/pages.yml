@@ -25,11 +25,14 @@ jobs:
       - name: Assemble static site
         run: |
           mkdir -p _site
-          cp index.html pathfinding.html search.html \
-             style.css script.js pathfinding.js pathfinding-core.js \
-             sorting-core.js search.js search-core.js \
-             manifest.json sw.js README.md CHANGELOG.md LICENSE _site/
+          # Copy by glob so a new lab's page, script or stylesheet can't be left out.
+          cp *.html *.css *.js manifest.json README.md CHANGELOG.md LICENSE _site/
           touch _site/.nojekyll
+      - name: Check every precached asset shipped
+        run: |
+          for asset in $(grep -o '"\./[^"]*"' sw.js | tr -d '"' | sed 's|^\./||'); do
+            test -f "_site/$asset" || { echo "sw.js precaches $asset but it is not in _site"; exit 1; }
+          done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

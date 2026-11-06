@@ -1,17 +1,26 @@
-/* Algo Lab — Service Worker v7 */
-const CACHE_NAME = "algo-lab-v7";
+/* Algo Lab — Service Worker v8 */
+const CACHE_NAME = "algo-lab-v8";
 const ASSETS = [
   "./",
   "./index.html",
   "./pathfinding.html",
   "./search.html",
+  "./database.html",
+  "./hypervisor.html",
   "./style.css",
+  "./database.css",
+  "./hypervisor.css",
+  "./lab-common.js",
   "./script.js",
   "./sorting-core.js",
   "./pathfinding.js",
   "./pathfinding-core.js",
   "./search.js",
   "./search-core.js",
+  "./database.js",
+  "./db-core.js",
+  "./hypervisor.js",
+  "./hypervisor-core.js",
   "./manifest.json",
 ];
 
@@ -37,20 +46,30 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
 
+  // Share links carry query strings (?algo=…, ?sample=…, ?scenario=…). Pages are
+  // cached without them, so navigations match on the path alone — otherwise a
+  // shared link would not open offline.
+  const isNavigation = event.request.mode === "navigate";
+  const cacheKey = isNavigation ? url.origin + url.pathname : event.request;
+
+  // Network first, cache as the offline fallback: a new deploy shows up on the
+  // very next load instead of one visit late (cache-first served stale files).
+  // "no-cache" revalidates with the server (a cheap 304 when nothing changed)
+  // instead of trusting the browser's heuristic HTTP cache.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fetched = fetch(event.request)
-        .then((response) => {
-          if (response.ok && event.request.url.startsWith(self.location.origin)) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
-
-      return cached || fetched;
-    })
+    fetch(event.request, { cache: "no-cache" })
+      .then((response) => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(cacheKey, clone));
+        }
+        return response;
+      })
+      .catch(() =>
+        caches.match(cacheKey, { ignoreSearch: isNavigation }).then((cached) => cached || Response.error())
+      )
   );
 });

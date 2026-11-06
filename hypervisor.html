@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Algo Lab — Hypervisor Lab: watch a virtual machine monitor run real guest programs. Trap-and-emulate VM exits, EPT vs shadow paging, credit and fair-share vCPU scheduling, KSM, ballooning, swap and live migration." />
+  <meta name="theme-color" content="#0b1220" />
+  <title>Algo Lab — Hypervisor Visualizer</title>
+  <script>
+    // Apply the saved theme before first paint; the lab script keeps it in sync afterwards.
+    try { document.documentElement.setAttribute("data-theme", localStorage.getItem("theme") || "dark"); }
+    catch (e) { document.documentElement.setAttribute("data-theme", "dark"); }
+  </script>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="hypervisor.css" />
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to lab</a>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-start">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">⚗</span>
+          <div>
+            <h1>Algo Lab</h1>
+            <p class="brand-sub">Hypervisor &amp; VM Visualizer</p>
+          </div>
+        </div>
+        <nav class="lab-switcher" aria-label="Choose a lab">
+          <a class="lab-pill" href="index.html">Sort Lab</a>
+          <a class="lab-pill" href="pathfinding.html">Path Lab</a>
+          <a class="lab-pill" href="search.html">Search Lab</a>
+          <a class="lab-pill" href="database.html">DB Lab</a>
+          <a class="lab-pill is-active" href="hypervisor.html" aria-current="page">Hypervisor Lab</a>
+        </nav>
+      </div>
+      <div class="topbar-actions">
+        <button id="shareUrlBtn" class="btn btn-ghost btn-sm" type="button" title="Copy a link to this scenario">🔗 Share</button>
+        <label class="toggle-pill" title="Sound effects on VM exits">
+          <input type="checkbox" id="soundToggle" aria-label="Toggle sound" />
+          <span>🔊 Sound</span>
+        </label>
+        <button id="cheatSheetBtn" class="icon-btn" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+        <button id="themeToggle" class="icon-btn" type="button" aria-label="Toggle dark mode">🌙</button>
+      </div>
+    </header>
+
+    <div class="workspace" id="workspace">
+      <aside class="sidebar">
+        <section class="panel">
+          <h2 class="panel-title">Scenario</h2>
+          <div class="field">
+            <label for="scenarioSelect">Scenario</label>
+            <select id="scenarioSelect"></select>
+          </div>
+          <p id="scenarioDescription" class="hv-note"></p>
+          <button id="loadScenarioBtn" class="btn btn-secondary btn-full" type="button">Load scenario</button>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">Run</h2>
+          <div class="btn-grid">
+            <button id="playBtn" class="btn btn-primary" type="button" title="Shortcut: Space">▶ Play</button>
+            <button id="stepBtn" class="btn btn-accent" type="button" title="Shortcut: N or .">Step 1 tick</button>
+            <button id="step10Btn" class="btn btn-secondary" type="button">Step ×10</button>
+            <button id="resetBtn" class="btn btn-danger" type="button" title="Shortcut: R">Reset</button>
+          </div>
+          <div class="field hv-field-top">
+            <label for="speed">Speed: <span id="speedValue">12</span> ticks/s</label>
+            <input type="range" id="speed" min="1" max="100" value="20" />
+          </div>
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="teachingMode" checked />
+              <span>Teaching Mode (narrated steps)</span>
+            </label>
+          </div>
+          <p class="shortcut-hint">Space play · N step · R reset · P paging · ? shortcuts</p>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">Host</h2>
+          <div class="field">
+            <label for="scheduler">vCPU scheduler</label>
+            <select id="scheduler">
+              <option value="round-robin">Round-robin</option>
+              <option value="credit">Credit (Xen-style weights &amp; caps)</option>
+              <option value="fair">Fair share (CFS-style)</option>
+            </select>
+          </div>
+          <div class="field">
+            <span class="field-legend" id="pagingLabel">Memory virtualization</span>
+            <div class="hv-segmented" role="radiogroup" aria-labelledby="pagingLabel">
+              <label><input type="radio" name="paging" value="ept" checked /> <span>EPT (nested)</span></label>
+              <label><input type="radio" name="paging" value="shadow" /> <span>Shadow paging</span></label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="quantum">Quantum: <span id="quantumValue">4</span> ticks</label>
+            <input type="range" id="quantum" min="1" max="20" value="4" />
+          </div>
+          <div class="field">
+            <label class="checkbox-row">
+              <input type="checkbox" id="ksmToggle" />
+              <span>KSM page sharing</span>
+            </label>
+          </div>
+          <div class="field">
+            <label for="pcpus">Physical CPUs: <span id="pcpusValue">2</span></label>
+            <input type="range" id="pcpus" min="1" max="4" value="2" />
+          </div>
+          <div class="field">
+            <label for="hostFrames">Host frames: <span id="hostFramesValue">32</span></label>
+            <input type="range" id="hostFrames" min="8" max="64" value="32" />
+          </div>
+          <p class="hv-note">pCPUs and host frames rebuild the current scenario; the rest change live.</p>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">Add a VM</h2>
+          <form id="addVmForm" class="hv-form" novalidate>
+            <div class="field">
+              <label for="vmName">Name</label>
+              <input type="text" id="vmName" value="guest" maxlength="16" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="vmProgram">Program</label>
+              <select id="vmProgram"></select>
+            </div>
+            <div class="field" id="customSourceField" hidden>
+              <label for="vmSource">HV-ASM source</label>
+              <textarea id="vmSource" rows="7" spellcheck="false"></textarea>
+            </div>
+            <div class="hv-form-grid">
+              <div class="field">
+                <label for="vmVcpus">vCPUs</label>
+                <input type="number" id="vmVcpus" min="1" max="4" value="1" />
+              </div>
+              <div class="field">
+                <label for="vmPages">Pages</label>
+                <input type="number" id="vmPages" min="1" max="32" value="4" />
+              </div>
+              <div class="field">
+                <label for="vmWeight">Weight</label>
+                <input type="number" id="vmWeight" min="1" max="4096" value="256" />
+              </div>
+              <div class="field">
+                <label for="vmCap">Cap %</label>
+                <input type="number" id="vmCap" min="0" max="100" value="0" />
+              </div>
+            </div>
+            <ul id="asmErrors" class="hv-asm-errors" role="alert" hidden></ul>
+            <button type="submit" class="btn btn-primary btn-full">Add VM</button>
+          </form>
+        </section>
+
+        <section class="panel" id="learningCardsPanel">
+          <h2 class="panel-title">Concept Cards</h2>
+          <div class="field">
+            <label for="conceptSelect" class="sr-only">Concept</label>
+            <select id="conceptSelect"></select>
+          </div>
+          <div id="learningCard" class="learning-card" tabindex="0" role="button" aria-label="Flip concept card">
+            <div class="learning-card-inner">
+              <div class="learning-card-front">
+                <span class="learning-card-label" id="conceptTitle">Concept</span>
+                <p id="learningTrivia" class="learning-card-text"></p>
+              </div>
+              <div class="learning-card-back">
+                <span class="learning-card-label">In real hypervisors</span>
+                <p id="learningUseCase" class="learning-card-text"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">Run History</h2>
+          <ul id="historyList" class="history-list"></ul>
+        </section>
+      </aside>
+
+      <main class="main-stage">
+        <p id="statusText" class="status-bar" aria-live="polite" role="status">Ready</p>
+
+        <section id="teachingPanel" class="teaching-panel" aria-labelledby="teachingTitle">
+          <h3 id="teachingTitle" class="teaching-title">Teaching Mode</h3>
+          <p id="teachingText" class="teaching-text" aria-live="polite" aria-atomic="true">Press Step to advance one tick and see what the hypervisor does.</p>
+        </section>
+
+        <section class="viz-pane" aria-labelledby="timelineTitle">
+          <div class="pane-header">
+            <h3 id="timelineTitle">pCPU Timeline</h3>
+            <div id="hostMetrics" class="metrics-strip"></div>
+          </div>
+          <div class="hv-timeline-wrap">
+            <canvas id="timeline" class="hv-timeline" role="img" aria-label="pCPU timeline"></canvas>
+          </div>
+          <p id="timelineReadout" class="hv-readout">Hover the timeline to inspect a tick.</p>
+          <div id="timelineLegend" class="hv-legend"></div>
+        </section>
+
+        <section class="hv-vms" id="vmCards" aria-label="Virtual machines"></section>
+
+        <div class="hv-grid">
+          <section class="viz-pane" aria-labelledby="memTitle">
+            <div class="pane-header">
+              <h3 id="memTitle">Host Memory</h3>
+              <div id="memMeta" class="metrics-strip"></div>
+            </div>
+            <div id="frameGrid" class="hv-frames" role="list" aria-label="Host frames"></div>
+            <div id="swapArea" class="hv-swap"></div>
+            <div id="p2mView" class="hv-p2m"></div>
+          </section>
+
+          <section class="viz-pane" aria-labelledby="xlateTitle">
+            <div class="pane-header">
+              <h3 id="xlateTitle">Address Translation</h3>
+              <div id="xlateMeta" class="metrics-strip"></div>
+            </div>
+            <div id="xlateView" class="hv-xlate"></div>
+            <div id="tlbTable" class="hv-tlb-table"></div>
+          </section>
+
+          <section class="viz-pane" aria-labelledby="exitTitle">
+            <div class="pane-header">
+              <h3 id="exitTitle">VM Exits</h3>
+              <div class="hv-inline">
+                <label for="exitFilter" class="sr-only">Filter exits</label>
+                <select id="exitFilter" class="hv-select"><option value="">All reasons</option></select>
+              </div>
+            </div>
+            <div class="hv-spark-wrap">
+              <svg id="exitSpark" class="hv-spark" viewBox="0 0 200 36" preserveAspectRatio="none" role="img" aria-label="Exits per 10 ticks"></svg>
+              <span class="hv-spark-label">exits / 10 ticks</span>
+            </div>
+            <div id="exitTotals" class="hv-exit-totals"></div>
+            <ol id="exitLog" class="hv-exit-log" aria-label="Most recent VM exits"></ol>
+          </section>
+
+          <section class="viz-pane" aria-labelledby="fairTitle">
+            <div class="pane-header">
+              <h3 id="fairTitle">CPU Fairness</h3>
+              <div id="fairMeta" class="metrics-strip"></div>
+            </div>
+            <div id="fairView" class="hv-fair"></div>
+          </section>
+
+          <section class="viz-pane hv-grid-wide" aria-labelledby="migTitle">
+            <div class="pane-header">
+              <h3 id="migTitle">Live Migration</h3>
+              <div id="migMeta" class="metrics-strip"></div>
+            </div>
+            <div id="migView" class="hv-mig"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="cheatSheet" class="cheat-sheet" aria-labelledby="cheatSheetTitle">
+    <div class="cheat-sheet-header">
+      <h2 id="cheatSheetTitle">Keyboard shortcuts</h2>
+      <button type="button" id="cheatSheetClose" class="icon-btn" aria-label="Close cheat sheet">×</button>
+    </div>
+    <ul class="cheat-sheet-list">
+      <li><kbd>Space</kbd> Play / pause</li>
+      <li><kbd>N</kbd> or <kbd>.</kbd> Step one tick</li>
+      <li><kbd>R</kbd> Reset the scenario</li>
+      <li><kbd>P</kbd> Toggle EPT / shadow paging</li>
+      <li><kbd>?</kbd> Toggle this cheat sheet</li>
+    </ul>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="a11yAnnouncer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+  <script src="lab-common.js"></script>
+  <script src="hypervisor-core.js"></script>
+  <script src="hypervisor.js"></script>
+</body>
+</html>
