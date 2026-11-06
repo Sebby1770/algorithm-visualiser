@@ -398,3 +398,60 @@ test("snapshots are JSON-safe and pausing a VM takes it off the CPU", () => {
   assert.ok(vmSnap(hv, id).p2m.every((p) => p.hfn === null));
   assert.deepEqual(hv.checkInvariants(), []);
 });
+
+// ---------- Memory-virtualization equivalence ----------
+
+/** A halting guest that stores, loads and remaps pages; deterministic for a seed. */
+function scratchProgram(seed, pages) {
+  const r = HyperCore.createRng(seed);
+  const words = pages * 16;
+  const lines = [`MOV r2, ${3 + Math.floor(r() * 4)}`, "loop:"];
+  for (let i = 0; i < 6 + Math.floor(r() * 8); i++) {
+    const k = r();
+    const reg = `r${Math.floor(r() * 2)}`;
+    if (k < 0.3) lines.push(`STORE ${reg}, [${Math.floor(r() * words)}]`);
+    else if (k < 0.5) lines.push(`LOAD ${reg}, [${Math.floor(r() * words)}]`);
+    else if (k < 0.6) lines.push(`WRPT ${Math.floor(r() * pages)}, ${Math.floor(r() * pages)}`);
+    else if (k < 0.85) lines.push(`ADD ${reg}, ${1 + Math.floor(r() * 9)}`);
+    else lines.push("XOR r0, r1");
+  }
+  lines.push("DEC r2", "JNZ r2, loop", "HLT");
+  return lines.join("\n");
+}
+
+function runToHalt(source, pages, options, neighbours) {
+  const hv = HyperCore.createHypervisor({ pcpus: 1, quantum: 3, ...options });
+  const id = hv.createVM({ name: "guest", source, memoryPages: pages });
+  for (let i = 0; i < neighbours; i++) hv.createVM({ name: `zero${i}`, source: HyperCore.SAMPLE_PROGRAMS["zero-reader"].source, memoryPages: 8 });
+  for (let t = 0; t < 20000; t++) {
+    hv.step();
+    const vm = vmSnap(hv, id);
+    if (vm.state === "halted") {
+      assert.deepEqual(hv.checkInvariants(), []);
+      const zeros = new Array(16).fill(0);
+      return { regs: vm.vcpus[0].regs, memory: hv.guestMemory(id).map((page) => page || zeros) };
+    }
+  }
+  return null;
+}
+
+test("guest results don't depend on EPT vs shadow, swap or KSM (and KSM can't livelock a writer)", () => {
+  const configs = [
+    { hostFrames: 64, paging: "shadow" },
+    { hostFrames: 4, paging: "ept" },
+    { hostFrames: 4, paging: "shadow", ksm: true, ksmInterval: 1 },
+    { hostFrames: 32, paging: "ept", ksm: true, ksmInterval: 1 },
+  ];
+  for (let seed = 1; seed <= 25; seed++) {
+    const pages = 2 + (seed % 5);
+    const source = scratchProgram(seed, pages);
+    const reference = runToHalt(source, pages, { hostFrames: 64, paging: "ept" }, 0);
+    assert.ok(reference, `seed ${seed}: reference run halts`);
+    configs.forEach((options, i) => {
+      const got = runToHalt(source, pages, options, i >= 1 ? 2 : 0);
+      assert.ok(got, `seed ${seed} config ${i}: guest must halt (no swap/KSM livelock)`);
+      assert.deepEqual(got.regs, reference.regs, `seed ${seed} config ${i}: registers`);
+      assert.deepEqual(got.memory, reference.memory, `seed ${seed} config ${i}: memory contents`);
+    });
+  }
+});

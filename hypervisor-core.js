@@ -322,10 +322,12 @@
       this.migrationQueue = [];
       this.completedMigrations = [];
       this.lastTranslation = null;
+      this.ksmSeen = new Map(); // hfn → generation + contents at the previous KSM scan
+      this.frameGen = 0;
     }
 
     blankFrame() {
-      return { content: new Array(this.options.pageSize).fill(0), refCount: 0, owners: [], cow: false };
+      return { content: new Array(this.options.pageSize).fill(0), refCount: 0, owners: [], cow: false, gen: 0, ksmHold: false };
     }
 
     emit(type, data = {}) {
@@ -486,6 +488,8 @@
       frame.refCount = 1;
       frame.owners = [{ vm: vm.id, gpfn }];
       frame.cow = false;
+      frame.ksmHold = false;
+      frame.gen = ++this.frameGen; // a reused frame is a different page as far as KSM can tell
       return hfn;
     }
 
@@ -689,6 +693,10 @@
       vm.p2m[gpfn].lastTouch = this.tick;
       if (write && this.frames[hfn].cow) {
         this.breakCow(vm, gpfn);
+        const copy = vm.p2m[gpfn].hfn;
+        // Don't let KSM re-merge the copy before the write it was made for lands.
+        this.frames[copy].ksmHold = true;
+        if (mode === "shadow") vm.shadow.set(vpage, copy);
         return { exit: { reason: "COW", detail: `write to shared guest page ${gpfn}: copied to private host frame ${vm.p2m[gpfn].hfn}` } };
       }
       const t = { vm: vm.id, vcpu: vcpu.id, gva, vpage, gpfn, hfn, hpa: hfn * size + offset, tlb: walkRefs ? "miss" : "hit", walkRefs, mode, write: !!write };
@@ -753,6 +761,7 @@
           const t = this.translate(pcpu, vm, vcpu, this.address(vcpu, a[1]), true);
           if (t.exit) return t.exit;
           this.frames[t.hfn].content[t.offset] = r[a[0].r];
+          this.frames[t.hfn].ksmHold = false;
           this.noteDirty(vm, t.gpfn);
           break;
         }
@@ -1054,13 +1063,22 @@
 
     // ----- page sharing (KSM) -----
 
-    /** Merges frames with identical contents into one copy-on-write frame. */
+    /**
+     * Merges frames with identical contents into one copy-on-write frame.
+     * Like Linux KSM, only pages whose contents didn't change since the last
+     * scan take part: pages under active writes are skipped. Without that, a
+     * scan landing inside a COW exit would re-merge the fresh private copy
+     * before the guest's write lands, and the write would fault forever.
+     */
     ksmScan() {
       const byContent = new Map();
+      const seen = new Map();
       let merged = 0;
       this.frames.forEach((frame, hfn) => {
         if (frame.refCount === 0) return;
         const key = frame.content.join(",");
+        seen.set(hfn, `${frame.gen}|${key}`);
+        if (frame.ksmHold || this.ksmSeen.get(hfn) !== `${frame.gen}|${key}`) return; // not stable for a whole interval yet
         if (!byContent.has(key)) {
           byContent.set(key, hfn);
           return;
@@ -1082,6 +1100,7 @@
         Object.assign(frame, this.blankFrame());
         merged++;
       });
+      this.ksmSeen = seen;
       this.emit("ksm-scan", { merged, freeFrames: this.frames.filter((f) => f.refCount === 0).length });
       return merged;
     }

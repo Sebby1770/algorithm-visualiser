@@ -25,6 +25,7 @@ All notable changes to Algo Lab (Algorithm Visualizer).
 - **Sort Lab text:** selection sort makes *at most* n−1 swaps; pancake sort's best case is O(n²) comparisons; quick sort uses O(n) stack in the worst case; corrected the Timsort trivia
 - **Search Lab:** jump and exponential search no longer grey out blocks they haven't reached; a blank target is rejected instead of searching for 0
 - **All labs** keep working when browser storage is blocked or full, and share links such as `?algo=constructor` no longer crash a page
+- **Hypervisor Lab — KSM livelock:** a scan landing inside a copy-on-write exit could re-merge the fresh private copy before the guest's write landed, so a writing guest could fault forever (found by fuzzing). KSM now merges only pages that stayed unchanged for a whole scan interval and never a copy waiting for its write; under shadow paging the COW exit also fixes the shadow entry
 
 ### Changed
 - Lab switcher lists five labs on every page; README and manifest describe all five

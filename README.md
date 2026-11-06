@@ -220,10 +220,10 @@ A virtual machine monitor simulator (`hypervisor-core.js`, global `HyperCore`). 
 | Trap-and-emulate | Ordinary instructions run directly; `OUT`, `IN`, `HLT`, `CLI`/`STI`, `CPUID`, `VMCALL`, `PAUSE` and (under shadow paging) `WRPT` cause **VM exits** that keep the pCPU in the VMM for a per-reason cost |
 | Memory virtualization | Guest-virtual → guest-physical (guest page table) → host-physical (p2m / EPT). **EPT**: no exits on page-table writes, 3-reference walks per TLB miss. **Shadow paging**: 1-reference walks but `PT_WRITE` and `SHADOW_PF` exits. Per-vCPU 4-entry TLB tagged by VM |
 | Scheduling | **Round-robin**, Xen-style **credit** (weights, UNDER/OVER priority, caps) and CFS-style **fair share**, with a timer interrupt (`EXTINT`) at the end of each quantum |
-| Memory overcommit | Lazy allocation (`EPT_VIOLATION` on first touch), **KSM** page sharing with copy-on-write, **ballooning** (hypervisor-requested or `VMCALL 1`), and host **swap** |
+| Memory overcommit | Lazy allocation (`EPT_VIOLATION` on first touch), **KSM** page sharing with copy-on-write (like Linux KSM, only pages unchanged for a whole scan interval are merged), **ballooning** (hypervisor-requested or `VMCALL 1`), and host **swap** |
 | Live migration | Iterative **pre-copy** over a link of configurable bandwidth, dirty-page tracking per round, stop-and-copy with measured downtime, switchover to “host B” |
 
-`checkInvariants()` cross-checks frames, p2m tables, swap, TLBs, shadow tables and run queues; the tests run it throughout 1500 ticks of every scenario.
+`checkInvariants()` cross-checks frames, p2m tables, swap, TLBs, shadow tables and run queues; the tests run it throughout 1500 ticks of every scenario, and check that a guest's final registers and memory are identical under EPT, shadow paging, heavy swap and aggressive KSM.
 
 ### Scenarios
 
